@@ -12,6 +12,8 @@ import { METRICS } from './lib/format.js';
 
 export const SITE = 'https://readmetape.com';
 export const REPO = 'OWNER/tape';
+/** Repo used in snippets: GITHUB_REPO from /api/config when the site has it, else REPO. */
+export const repoName = () => (typeof globalThis !== 'undefined' && globalThis.__SITE_REPO__) || REPO;
 export const DEX_API = 'https://api.dexscreener.com';
 export const GECKO_API = 'https://api.geckoterminal.com/api/v2';
 export const CHAINS = ['solana', 'base', 'ethereum', 'bsc', 'arbitrum', 'polygon', 'avalanche', 'optimism'];
@@ -248,7 +250,7 @@ export function workflowYaml(s) {
     '    runs-on: ubuntu-latest',
     '    steps:',
     '      - uses: actions/checkout@v4',
-    `      - uses: ${REPO}@v1`,
+    `      - uses: ${repoName()}@v1`,
     '        with:',
     ...inputs.map(([k, v]) => `          ${k}: ${yamlValue(v)}`),
   ].join('\n');
