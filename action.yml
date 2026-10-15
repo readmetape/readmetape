@@ -1,0 +1,103 @@
+name: Tape
+description: Live coin cards for your README. Renders a token's price, chart and mcap as an SVG and commits it only when the numbers change.
+author: Tape contributors
+branding:
+  icon: trending-up
+  color: orange
+inputs:
+  tokens:
+    description: Comma separated token addresses. Use chain:address to mix chains, for example "So111...,base:0xabc...".
+    required: false
+  token:
+    description: A single token address (kept for v0 workflows). Added to "tokens" when both are set.
+    required: false
+  chain:
+    description: Default DexScreener chain id for tokens without a chain prefix (solana, ethereum, base, bsc, ...).
+    required: false
+    default: solana
+  type:
+    description: What to render. One of card, spark, badge.
+    required: false
+    default: card
+  theme:
+    description: Card theme. One of dark, light, github_dark, transparent, cream, espresso.
+    required: false
+    default: dark
+  timeframe:
+    description: Chart and change window. One of 24h, 7d.
+    required: false
+    default: 24h
+  colors:
+    description: Card colour overrides as key=hex pairs, for example "bg=fffdf8,accent=f29e1f". Keys are bg, border, text, muted, accent, up, down.
+    required: false
+  hide-border:
+    description: Draw the card without a border.
+    required: false
+    default: 'false'
+  token-logo:
+    description: Embed the token logo from DexScreener in cards (falls back to a monogram).
+    required: false
+    default: 'true'
+  label:
+    description: Badge left text, or a chip next to the symbol on cards. For example "paid to dev".
+    required: false
+  label-color:
+    description: Badge left background colour (hex).
+    required: false
+  metric:
+    description: Badge value (price, mcap, change, volume, all) or spark value (price, change).
+    required: false
+  style:
+    description: Badge and spark style. One of flat, flat-square, for-the-badge.
+    required: false
+    default: flat
+  logo:
+    description: Optional chain icon on badges and sparks. One of solana, ethereum.
+    required: false
+  path:
+    description: Output file for every token. Placeholders {n}, {chain}, {address}, {symbol}. Defaults to .github/tape.svg, or .github/tape-{n}.svg for several tokens.
+    required: false
+  paths:
+    description: Comma separated output files, one per token, in the same order as "tokens".
+    required: false
+  grid:
+    description: Optional extra file that combines all rendered tokens in one grid SVG.
+    required: false
+  columns:
+    description: Grid columns. Defaults to 2 for cards and 1 for badges.
+    required: false
+  cache:
+    description: Optional JSON file for chart data. Fresh data skips a GeckoTerminal request; old data is used when GeckoTerminal is rate limited.
+    required: false
+  cache-ttl:
+    description: Minutes for which cached chart data counts as fresh.
+    required: false
+    default: '10'
+  commit:
+    description: Commit and push the files when what they show changed.
+    required: false
+    default: 'true'
+  commit-message:
+    description: Commit message.
+    required: false
+    default: 'chore: update tape'
+outputs:
+  price:
+    description: Price in USD of the first token, empty when no pair exists.
+  mcap:
+    description: Market cap in USD of the first token (falls back to FDV).
+  change:
+    description: Price change in percent of the first token over the timeframe.
+  svg-path:
+    description: Path of the first written SVG, relative to the repository root.
+  paths:
+    description: Comma separated paths of all token SVGs.
+  changed:
+    description: true when any SVG changed in this run.
+  committed:
+    description: true when a commit was pushed.
+  data:
+    description: JSON array with chain, address, symbol, priceUsd, marketCap, change, timeframe and path per token.
+runs:
+  using: node20
+  main: src/action.js

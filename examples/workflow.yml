@@ -1,0 +1,31 @@
+# Copy to .github/workflows/tape.yml in your repository.
+name: tape
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # every 30 minutes (GitHub runs schedules on a best effort basis)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tape
+  cancel-in-progress: true
+
+jobs:
+  tape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: tape
+        uses: OWNER/tape@v1
+        with:
+          tokens: YOUR_TOKEN_ADDRESS        # several: "addr1,base:0xaddr2"
+          type: card                        # card | spark | badge
+          theme: cream                      # cream | espresso | dark | light | github_dark | transparent
+          timeframe: 24h                    # 24h | 7d
+          label: paid to dev                # optional chip next to the symbol
+          path: .github/tape.svg
+          cache: .github/tape-cache.json
+      - run: echo "price=${{ steps.tape.outputs.price }} changed=${{ steps.tape.outputs.changed }}"

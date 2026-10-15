@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tape preview</title>
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<style>
+@font-face { font-family: "Fraunces"; src: url(/fonts/fraunces-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url(/fonts/fraunces-latin-600-normal.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url(/fonts/fraunces-latin-400-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Fragment Mono"; src: url(/fonts/fragment-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+:root {
+  --bg: #F6F1E8; --card: #FFFDF8; --raised: #EFE7D9; --line: #E2D7C3; --line-strong: #D3C5AC;
+  --text: #1C1914; --muted: #7A6F5E; --accent: #F29E1F; --accent-text: #9A5B00; --on-accent: #1C1914;
+  --up: #2E7D4F; --down: #B3402E; --focus: rgba(242,158,31,.45); --skeleton: #EAE1D1;
+  --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono: "Fragment Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --r: 6px;
+  color-scheme: light;
+}
+:root[data-theme="espresso"] {
+  --bg: #17120C; --card: #211A12; --raised: #2C2318; --line: #3A2F22; --line-strong: #4C3E2D;
+  --text: #F3EADB; --muted: #A39580; --accent: #F29E1F; --accent-text: #F29E1F; --on-accent: #17120C;
+  --up: #6CBF8E; --down: #E07A64; --focus: rgba(242,158,31,.5); --skeleton: #2C2318;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 400 16px/1.55 var(--serif); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+pre, code, input, select, .btn, .seg button, .caps, .chip, .ledger .v, .price, .chg, .ver, .tabs button, .toast { font-variant-ligatures: none; }
+.caps { font: 400 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 48px; }
+
+/* masthead */
+header { border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 12px; height: 64px; }
+header img { width: 28px; height: 28px; border-radius: 6px; display: block; }
+.word { font: 600 26px/1 var(--serif); letter-spacing: -.02em; }
+.ver { font: 400 12px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r); padding: 2px 8px; }
+header .note { margin-left: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--r); padding: 2px; gap: 2px; background: var(--card); }
+.seg button { border: 0; background: none; border-radius: 4px; height: 28px; padding: 0 12px; cursor: pointer; color: var(--muted); font: 400 12px var(--mono); }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+.seg.full { display: flex; }
+.seg.full button { flex: 1; }
+
+/* token form */
+form.token { display: grid; grid-template-columns: 1fr 180px auto; gap: 12px; align-items: end; padding: 32px 0; border-bottom: 1px solid var(--line); }
+.field { display: grid; gap: 8px; min-width: 0; }
+input[type="text"], select { height: 40px; width: 100%; min-width: 0; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 0 12px; font: 400 14px var(--mono); }
+input[type="text"]::placeholder { color: var(--muted); opacity: .8; }
+input[type="text"]:hover, select:hover { border-color: var(--muted); }
+input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 17px) 18px, calc(100% - 12px) 18px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+.btn { height: 40px; padding: 0 16px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--card); cursor: pointer; font: 400 13px var(--mono); white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+.btn:hover { border-color: var(--muted); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.primary[disabled] { opacity: .6; cursor: progress; }
+.btn.sm { height: 30px; padding: 0 12px; font-size: 12px; }
+.btn.link { border-color: transparent; background: none; padding: 0 4px; height: 30px; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+/* statement header */
+.statement { display: grid; grid-template-columns: 1fr 360px; gap: 48px; padding: 48px 0 32px; align-items: end; }
+.statement h1 { font: 600 56px/1 var(--serif); letter-spacing: -.03em; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.statement .sub { font-style: italic; color: var(--muted); font-size: 18px; margin: 0; }
+.key { text-align: right; }
+.key .price { font: 400 44px/1 var(--mono); color: var(--accent-text); letter-spacing: -.02em; margin: 8px 0 12px; font-variant-numeric: tabular-nums; }
+.chg { font: 400 14px var(--mono); }
+.chg.up { color: var(--up); } .chg.down { color: var(--down); }
+.chg .tf { color: var(--muted); }
+
+/* columns */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; align-items: start; padding-bottom: 64px; }
+.sec-head { display: flex; align-items: flex-end; min-height: 52px; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--text); margin-bottom: 24px; flex-wrap: wrap; }
+.sec-head h2 { font: 600 22px/1.2 var(--serif); letter-spacing: -.01em; margin: 0; }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stage { border: 1px solid var(--line); border-radius: var(--r); padding: 48px 32px; display: grid; place-items: center; min-height: 300px; transition: background .2s; }
+.stage[data-bg="cream"] { background: #F6F1E8; } .stage[data-bg="espresso"] { background: #17120C; }
+.stage[data-bg="light"] { background: #FFFFFF; } .stage[data-bg="dark"] { background: #0D1117; }
+.svgbox { width: 100%; min-width: 0; display: grid; place-items: center; }
+.svgbox.is-card svg { width: min(100%, 620px); }
+.stage { min-width: 0; }
+.svgbox svg { max-width: 100%; height: auto; display: block; }
+.stage-cap { margin-top: 12px; display: flex; justify-content: space-between; gap: 16px; }
+
+.tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line); margin-top: 48px; }
+.tabs button { background: none; border: 0; padding: 0 0 12px; margin-bottom: -1px; cursor: pointer; font: 400 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid transparent; }
+.tabs button:hover { color: var(--text); }
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+.snippet { position: relative; margin-top: 16px; }
+pre { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 112px 16px 16px; font: 400 13px/1.7 var(--mono); overflow-x: auto; white-space: pre; color: var(--text); }
+.snippet .btn { position: absolute; top: 12px; right: 12px; }
+
+/* ledger column */
+.ledger { list-style: none; margin: 0; padding: 0; }
+.ledger li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ledger li .v { font: 400 15px var(--mono); font-variant-numeric: tabular-nums; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger li .v.dim { color: var(--muted); }
+.aside-block + .aside-block { margin-top: 48px; }
+.ctrl { display: grid; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.ctrl:first-of-type { padding-top: 0; }
+.ctrl[hidden] { display: none; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font: 400 12px var(--mono); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 4px 8px; background: none; cursor: pointer; color: var(--muted); }
+.chip:hover { color: var(--text); border-color: var(--muted); }
+.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.swatch { display: grid; gap: 4px; }
+.swatch input { width: 100%; height: 32px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--card); padding: 3px; cursor: pointer; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+/* gallery */
+.gallery { border-top: 1px solid var(--line); padding: 48px 0 64px; }
+.gallery .intro { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 48px; margin-bottom: 32px; align-items: end; }
+.gallery h2 { font: 600 32px/1.1 var(--serif); letter-spacing: -.02em; margin: 0; }
+.gallery p { margin: 0; color: var(--muted); font-style: italic; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+.tile { border: 1px solid var(--line); border-radius: var(--r); background: var(--card); overflow: hidden; display: flex; flex-direction: column; }
+.tile .view { padding: 24px; display: grid; place-items: center; min-height: 168px; min-width: 0; border-bottom: 1px solid var(--line); }
+.tile .view.cream { background: #F6F1E8; } .tile .view.espresso { background: #17120C; } .tile .view.light { background: #FFFFFF; } .tile .view.dark { background: #0D1117; }
+.tile .view.split { background: linear-gradient(90deg, #FFFFFF 50%, #0D1117 50%); }
+.tile .meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 8px 16px; }
+.tile .meta code { font: 400 12px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* states */
+.empty-note { font: 400 32px/1.2 var(--serif); letter-spacing: -.02em; margin: 0 0 12px; }
+.ghost { border: 1px dashed var(--line-strong); border-radius: var(--r); width: 495px; max-width: 100%; aspect-ratio: 495 / 195; display: grid; place-items: center; color: var(--muted); font-style: italic; }
+.sk { display: inline-block; background: var(--skeleton); border-radius: 4px; height: 1em; width: 100%; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.err { border: 1px solid var(--line); border-left: 2px solid var(--down); background: var(--card); border-radius: var(--r); padding: 12px 16px; color: var(--text); margin-top: 16px; font-size: 15px; }
+.err b { color: var(--down); font-weight: 600; }
+[hidden] { display: none !important; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 16px); opacity: 0; background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: var(--r); transition: .2s; pointer-events: none; font: 400 12px var(--mono); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+footer { border-top: 1px solid var(--line); }
+footer .wrap { display: flex; align-items: center; gap: 12px; padding-top: 24px; padding-bottom: 32px; color: var(--muted); font-size: 14px; font-style: italic; }
+footer svg { width: 16px; height: 16px; flex: none; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 1080px) {
+  .cols, .statement, .gallery .intro { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .key { text-align: left; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px; }
+  header .note { display: none; }
+  header .seg { margin-left: auto; }
+  form.token { grid-template-columns: 1fr 1fr; padding: 24px 0; }
+  form.token .field:first-child { grid-column: 1 / -1; }
+  .statement { padding: 32px 0 24px; }
+  .statement h1 { font-size: 40px; }
+  .key .price { font-size: 32px; }
+  .stage { padding: 24px 12px; min-height: 0; }
+  .sec-head .tools { width: 100%; }
+  .sec-head .seg { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; } .sec-head .seg button { padding: 0 2px; font-size: 11px; }
+  .sec-head .tools .btn { width: 100%; }
+  .tiles { grid-template-columns: 1fr; }
+  .gallery h2 { font-size: 26px; }
+  pre { padding-right: 16px; padding-top: 52px; }
+  .stage-cap { flex-direction: column; gap: 4px; }
+  .tabs { gap: 16px; }
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <img src="/icon.png" alt=""><span class="word">tape</span><span class="ver" id="ver">v</span>
+  <span class="note caps">local preview, 127.0.0.1 only</span>
+  <div class="seg" id="mode" role="group" aria-label="Page theme"><button type="button" data-mode="cream">Cream</button><button type="button" data-mode="espresso">Espresso</button></div>
+</div></header>
+
+<main>
+  <div class="wrap">
+    <form class="token" id="search">
+      <div class="field"><label class="caps" for="token">Token address</label><input id="token" type="text" placeholder="mint or contract address" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label class="caps" for="chain">Chain</label><select id="chain"><option>solana</option><option>ethereum</option><option>base</option><option>bsc</option><option>arbitrum</option><option>polygon</option><option>avalanche</option><option>optimism</option></select></div>
+      <button class="btn primary" type="submit" id="loadBtn">Load token</button>
+    </form>
+
+    <section class="statement" id="statement">
+      <div>
+        <div class="caps" id="stEyebrow">No token loaded</div>
+        <h1 id="stTitle">Paste a mint to start.</h1>
+        <p class="sub" id="stSub">tape pulls the price from DexScreener and the chart from GeckoTerminal, then renders the card on this machine.</p>
+      </div>
+      <div class="key">
+        <div class="caps">Price, USD</div>
+        <div class="price" id="stPrice">n/a</div>
+        <div class="chg" id="stChange"><span class="tf">change shows here</span></div>
+      </div>
+    </section>
+    <div id="error" class="err" role="alert" hidden></div>
+
+    <div class="cols">
+      <div>
+        <div class="sec-head">
+          <h2>Preview</h2>
+          <div class="tools">
+            <div class="seg" id="stageBg" role="group" aria-label="Preview background"><button type="button" data-bg="cream">Cream</button><button type="button" data-bg="espresso">Espresso</button><button type="button" data-bg="light">GitHub light</button><button type="button" data-bg="dark">GitHub dark</button></div>
+            <a class="btn sm" id="download" download="tape.svg" aria-disabled="true">Download SVG</a>
+          </div>
+        </div>
+        <div class="stage" id="stage" data-bg="cream"><div class="svgbox" id="preview"><div class="ghost">your card renders here</div></div></div>
+        <div class="stage-cap"><span class="caps" id="dims">495 x 195 svg</span><span class="caps">github safe: no scripts, logo inlined</span></div>
+
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-tab="md" aria-selected="true">README</button>
+          <button type="button" role="tab" data-tab="yml" aria-selected="false">Workflow</button>
+          <button type="button" role="tab" data-tab="cli" aria-selected="false">CLI</button>
+        </div>
+        <div class="snippet"><pre id="snippet">load a token to get the snippets.</pre><button class="btn sm" type="button" id="copy">Copy</button></div>
+      </div>
+
+      <aside>
+        <div class="aside-block">
+          <div class="sec-head"><h2>Ledger</h2><span class="caps" id="ledgerSrc">dexscreener</span></div>
+          <ul class="ledger" id="ledger"></ul>
+        </div>
+        <div class="aside-block">
+          <div class="sec-head"><h2>Builder</h2><button type="button" class="btn link" id="resetAll">reset</button></div>
+          <div class="ctrl"><span class="caps">Type</span><div class="seg full" data-key="type"><button type="button" data-v="card">card</button><button type="button" data-v="spark">spark</button><button type="button" data-v="badge">badge</button></div></div>
+          <div class="ctrl"><span class="caps">Timeframe</span><div class="seg full" data-key="timeframe"><button type="button" data-v="24h">24h</button><button type="button" data-v="7d">7d</button></div></div>
+          <div class="ctrl" data-for="card"><label class="caps" for="theme">Theme</label><select id="theme" data-key="theme"></select></div>
+          <div class="ctrl" data-for="spark badge"><div class="row2">
+            <div class="field"><label class="caps" for="style">Style</label><select id="style" data-key="style"></select></div>
+            <div class="field"><label class="caps" for="metric">Value</label><select id="metric" data-key="metric"></select></div>
+          </div><div class="field"><label class="caps" for="logo">Chain icon</label><select id="logo" data-key="logo"><option value="">none</option></select></div></div>
+          <div class="ctrl"><label class="caps" for="label">Label</label><input id="label" type="text" data-key="label" placeholder="defaults to $SYMBOL on badges">
+            <div class="chips"><button type="button" class="chip" data-label="paid to dev">paid to dev</button><button type="button" class="chip" data-label="dev fees">dev fees</button><button type="button" class="chip" data-label="">clear</button></div></div>
+          <div class="ctrl" data-for="card"><span class="caps">Colours</span>
+            <div class="swatches">
+              <label class="swatch"><input type="color" data-color="accent"><span class="caps">accent</span></label>
+              <label class="swatch"><input type="color" data-color="bg"><span class="caps">bg</span></label>
+              <label class="swatch"><input type="color" data-color="up"><span class="caps">up</span></label>
+              <label class="swatch"><input type="color" data-color="down"><span class="caps">down</span></label>
+            </div></div>
+          <div class="ctrl" data-for="card">
+            <label class="check"><input type="checkbox" data-key="hideBorder"> Hide the border</label>
+            <label class="check"><input type="checkbox" data-key="nologo"> Monogram instead of the logo</label>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <section class="gallery" id="gallery" hidden><div class="wrap">
+    <div class="intro"><h2>Every style</h2><p>every built-in look for this token, rendered live. Use loads one into the builder.</p></div>
+    <div class="tiles" id="tiles"></div>
+  </div></section>
+</main>
+<footer><div class="wrap">__MARK__<span>tape renders every SVG on this machine. prices from DexScreener, charts from GeckoTerminal. not financial advice.</span></div></footer>
+<div class="toast" id="toast" role="status">Copied</div>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const THEME_DEFAULTS = {
+  cream: { bg: '#fffdf8', accent: '#9a5b00', up: '#2e7d4f', down: '#b3402e' }, espresso: { bg: '#211a12', accent: '#f29e1f', up: '#6cbf8e', down: '#e07a64' },
+  dark: { bg: '#0f0f12', accent: '#f29e1f', up: '#3ddc84', down: '#ff5f6d' }, light: { bg: '#ffffff', accent: '#9a6700', up: '#1a7f37', down: '#d1242f' },
+  github_dark: { bg: '#151b23', accent: '#4493f8', up: '#3fb950', down: '#f85149' }, transparent: { bg: '#ffffff', accent: '#d99a00', up: '#2da44e', down: '#e5534b' },
+};
+const VIEW = { cream: 'cream', espresso: 'espresso', light: 'light', dark: 'dark', github_dark: 'dark', transparent: 'split' };
+const DEFAULTS = { type: 'card', timeframe: '24h', theme: 'cream', style: 'flat', metric: '', logo: '', label: '', hideBorder: false, nologo: false, colors: {} };
+const state = { token: '', chain: 'solana', ...DEFAULTS, colors: {} };
+let meta = {}, quote = null, tab = 'md', stageBg = 'cream', uid = 0;
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const esc = (s) => String(s ?? 'n/a').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function qs(s) {
+  const p = new URLSearchParams({ token: s.token, chain: s.chain, type: s.type, timeframe: s.timeframe });
+  if (s.type === 'card') { p.set('theme', s.theme); if (s.hideBorder) p.set('hideBorder', '1'); if (s.nologo) p.set('nologo', '1');
+    const c = Object.entries(s.colors).map(([k, v]) => k + '=' + v.replace('#', '')).join(','); if (c) p.set('colors', c); }
+  else { p.set('style', s.style); if (s.metric) p.set('metric', s.metric); if (s.logo) p.set('logo', s.logo); }
+  if (s.label) p.set('label', s.label);
+  return p.toString();
+}
+const svgUrl = (s) => '/api/render.svg?' + qs(s);
+
+// SVGs are inlined (not <img>) so the page fonts apply. Ids get a per-mount
+// suffix so several copies of one SVG never share gradient or clip ids.
+async function mountSvg(el, url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'render failed (' + r.status + ')');
+  let svg = await r.text();
+  for (const p of new Set([...svg.matchAll(/id="(pt[0-9a-z]+)-/g)].map((m) => m[1]))) svg = svg.split(p).join(p + 'u' + (++uid));
+  el.innerHTML = svg;
+  return svg;
+}
+
+function yaml(s) {
+  const w = [['tokens', s.chain === 'solana' ? s.token : s.chain + ':' + s.token]];
+  if (s.type !== 'card') w.push(['type', s.type]);
+  if (s.type === 'card' && s.theme !== 'dark') w.push(['theme', s.theme]);
+  if (s.timeframe !== '24h') w.push(['timeframe', s.timeframe]);
+  if (s.label) w.push(['label', JSON.stringify(s.label)]);
+  if (s.type !== 'card') { if (s.style !== 'flat') w.push(['style', s.style]); if (s.metric) w.push(['metric', s.metric]); if (s.logo) w.push(['logo', s.logo]); }
+  if (s.type === 'card') { const c = Object.entries(s.colors).map(([k, v]) => k + '=' + v.replace('#', '')).join(','); if (c) w.push(['colors', c]); if (s.hideBorder) w.push(['hide-border', 'true']); if (s.nologo) w.push(['token-logo', 'false']); }
+  return ['name: tape', 'on:', "  schedule: [{ cron: '*/30 * * * *' }]", '  workflow_dispatch:', 'permissions:', '  contents: write', 'jobs:', '  tape:', '    runs-on: ubuntu-latest', '    steps:', '      - uses: actions/checkout@v4', '      - uses: OWNER/tape@v1', '        with:', ...w.map(([k, v]) => '          ' + k + ': ' + v)].join('\n');
+}
+function cli(s) {
+  const a = ['npx readme-tape', s.chain === 'solana' ? s.token : s.chain + ':' + s.token, '--type ' + s.type];
+  if (s.type === 'card' && s.theme !== 'dark') a.push('--theme ' + s.theme);
+  if (s.timeframe !== '24h') a.push('--timeframe ' + s.timeframe);
+  if (s.label) a.push('--label ' + JSON.stringify(s.label));
+  if (s.type !== 'card') { if (s.style !== 'flat') a.push('--style ' + s.style); if (s.metric) a.push('--metric ' + s.metric); if (s.logo) a.push('--logo ' + s.logo); }
+  if (s.type === 'card') { for (const [k, v] of Object.entries(s.colors)) a.push('--' + k + ' ' + v.replace('#', '')); if (s.hideBorder) a.push('--hide-border'); if (s.nologo) a.push('--no-logo'); }
+  a.push('--out .github/tape.svg');
+  return a.join(' \\\n  ');
+}
+function markdown() {
+  const alt = quote && quote.symbol ? '$' + quote.symbol + ' price' : 'coin price';
+  const img = '![' + alt + '](.github/tape.svg)';
+  return quote && quote.url ? '[' + img + '](' + quote.url + ')' : img;
+}
+function snippet() { return !state.token ? 'load a token to get the snippets.' : tab === 'md' ? markdown() : tab === 'yml' ? yaml(state) : cli(state); }
+
+function ledger(q, loading) {
+  const rows = [['Price', q && q.price], ['Change ' + state.timeframe, q && q.change], ['Market cap', q && q.mcap], ['Liquidity', q && q.liquidity], ['Volume 24h', q && q.volume], ['Chart points', q && q.candles], ['Pair', q && q.pair ? q.pair.slice(0, 6) + '...' + q.pair.slice(-4) : null], ['DEX', q && q.dex]];
+  $('#ledger').innerHTML = rows.map(([k, v]) => '<li><span class="caps">' + esc(k) + '</span>' +
+    (loading ? '<span class="v" style="width:96px"><span class="sk"></span></span>' : '<span class="v' + (v == null || v === '' ? ' dim' : '') + '">' + esc(v == null || v === '' ? 'n/a' : v) + '</span>') + '</li>').join('');
+}
+
+let renderSeq = 0;
+async function sync() {
+  $$('.seg[data-key]').forEach((seg) => $$('button', seg).forEach((b) => b.setAttribute('aria-pressed', String(state[seg.dataset.key] === b.dataset.v))));
+  $$('#stageBg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.bg === stageBg)));
+  $$('[data-for]').forEach((el) => { el.hidden = !el.dataset.for.split(' ').includes(state.type); });
+  $('#theme').value = state.theme; $('#style').value = state.style; $('#logo').value = state.logo; $('#label').value = state.label;
+  const metrics = state.type === 'spark' ? ['price', 'change'] : meta.metrics || [];
+  $('#metric').innerHTML = '<option value="">default</option>' + metrics.map((m) => '<option>' + m + '</option>').join('');
+  if (state.metric && !metrics.includes(state.metric)) state.metric = '';
+  $('#metric').value = state.metric;
+  $$('[data-key=hideBorder],[data-key=nologo]').forEach((c) => { c.checked = state[c.dataset.key]; });
+  const d = THEME_DEFAULTS[state.theme] || THEME_DEFAULTS.cream;
+  $$('[data-color]').forEach((i) => { i.value = state.colors[i.dataset.color] || d[i.dataset.color]; });
+  $('#stage').dataset.bg = stageBg;
+  $('#snippet').textContent = snippet();
+  if (!state.token || !quote) return;
+  const url = svgUrl(state);
+  $('#download').href = url; $('#download').removeAttribute('aria-disabled');
+  $('#dims').textContent = state.type === 'card' ? '495 x 195 svg, ' + state.theme : state.type + ' badge, ' + state.style;
+  const seq = ++renderSeq;
+  try { const box = document.createElement('div'); box.className = 'svgbox' + (state.type === 'card' ? ' is-card' : ''); await mountSvg(box, url); if (seq === renderSeq) $('#preview').replaceWith(Object.assign(box, { id: 'preview' })); }
+  catch (e) { if (seq === renderSeq) $('#preview').innerHTML = '<div class="ghost">' + esc(e.message) + '</div>'; }
+  const p = new URLSearchParams({ token: state.token, chain: state.chain }); history.replaceState(null, '', '?' + p);
+}
+
+function tiles() {
+  const base = { ...state, label: '', colors: {}, hideBorder: false, nologo: false, metric: '', logo: '', style: 'flat' };
+  const list = [
+    ...meta.themes.map((t) => ({ ...base, type: 'card', theme: t, cap: 'card, ' + t, view: VIEW[t] || 'cream' })),
+    { ...base, type: 'card', theme: 'cream', timeframe: '7d', cap: 'card, cream, 7d chart', view: 'cream' },
+    { ...base, type: 'card', theme: 'espresso', label: 'paid to dev', cap: 'card, espresso, paid to dev', view: 'espresso' },
+    ...meta.styles.map((st) => ({ ...base, type: 'spark', style: st, cap: 'spark, ' + st, view: 'light' })),
+    ...meta.metrics.map((m) => ({ ...base, type: 'badge', metric: m, cap: 'badge, ' + m, view: 'light' })),
+    { ...base, type: 'badge', style: 'for-the-badge', label: 'paid to dev', metric: 'price', cap: 'badge, paid to dev', view: 'light' },
+  ];
+  $('#tiles').innerHTML = '';
+  for (const s of list) {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.innerHTML = '<div class="view ' + s.view + '"><div class="svgbox"><span class="sk" style="width:240px;height:64px"></span></div></div><div class="meta"><code></code><button class="btn sm" type="button">Use</button></div>';
+    $('code', el).textContent = s.cap;
+    mountSvg($('.svgbox', el), svgUrl(s)).catch((e) => { $('.svgbox', el).innerHTML = '<span class="caps">' + esc(e.message) + '</span>'; });
+    $('button', el).onclick = () => { const { cap, view, ...rest } = s; Object.assign(state, rest); if (s.type === 'card') stageBg = VIEW[s.theme] === 'split' ? 'light' : VIEW[s.theme]; sync(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    $('#tiles').appendChild(el);
+  }
+}
+
+function statement(q) {
+  if (!q) return;
+  $('#stEyebrow').textContent = q.found ? (q.chainName || q.chain) + (q.dex ? ' / ' + q.dex : '') : 'No pair yet';
+  $('#stTitle').textContent = q.found ? '$' + q.symbol : q.address.slice(0, 6) + '...' + q.address.slice(-4);
+  $('#stSub').textContent = q.found ? q.name + ', the most liquid pair on DexScreener.' : 'DexScreener has no trading pair for this address yet. every preview shows the "no pair yet" state.';
+  $('#stPrice').textContent = q.price || 'n/a';
+  $('#stChange').className = 'chg' + (q.up === true ? ' up' : q.up === false ? ' down' : '');
+  $('#stChange').innerHTML = q.change ? (q.up ? '&#9650; ' : '&#9660; ') + esc(q.change.replace(/^[+-]/, '')) + ' <span class="tf">' + esc(state.timeframe) + '</span>' : '<span class="tf">no change data</span>';
+}
+
+async function load() {
+  state.token = $('#token').value.trim(); state.chain = $('#chain').value;
+  $('#error').hidden = true;
+  if (!state.token) { $('#error').innerHTML = '<b>Missing address.</b> paste a mint or contract address first.'; $('#error').hidden = false; $('#token').focus(); return; }
+  $('#loadBtn').disabled = true; $('#loadBtn').textContent = 'Loading...';
+  ledger(null, true);
+  $('#stPrice').innerHTML = '<span class="sk" style="width:180px"></span>';
+  try {
+    const r = await fetch('/api/quote?' + new URLSearchParams({ token: state.token, chain: state.chain, timeframe: state.timeframe }));
+    const q = await r.json();
+    if (!r.ok) throw new Error(q.error || 'request failed');
+    quote = q;
+    statement(q); ledger(q);
+    $('#gallery').hidden = false;
+    await sync(); tiles();
+  } catch (e) {
+    $('#error').innerHTML = '<b>Could not load this token.</b> ' + esc(e.message);
+    $('#error').hidden = false; ledger(quote); statement(quote); if (!quote) $('#stPrice').textContent = 'n/a';
+  } finally { $('#loadBtn').disabled = false; $('#loadBtn').textContent = 'Load token'; }
+}
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1400); }
+function setMode(m) { document.documentElement.dataset.theme = m; store.set('tape-mode', m); $$('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m))); }
+
+(async () => {
+  setMode(store.get('tape-mode') === 'espresso' ? 'espresso' : 'cream');
+  if (document.documentElement.dataset.theme === 'espresso') { state.theme = 'espresso'; stageBg = 'espresso'; }
+  ledger(null);
+  try { meta = await (await fetch('/api/meta')).json(); } catch { $('#error').innerHTML = '<b>The local server stopped.</b> run tape ui again.'; $('#error').hidden = false; return; }
+  $('#ver').textContent = 'v' + meta.version;
+  $('#theme').innerHTML = meta.themes.map((t) => '<option>' + t + '</option>').join('');
+  $('#style').innerHTML = meta.styles.map((t) => '<option>' + t + '</option>').join('');
+  $('#logo').innerHTML += meta.logos.map((t) => '<option>' + t + '</option>').join('');
+  const p = new URLSearchParams(location.search);
+  $('#token').value = p.get('token') || meta.token || '';
+  $('#chain').value = p.get('chain') || meta.chain || 'solana';
+  $('#search').onsubmit = (e) => { e.preventDefault(); load(); };
+  $$('#mode button').forEach((b) => b.onclick = () => { setMode(b.dataset.mode); if (state.type === 'card' && ['cream', 'espresso'].includes(state.theme)) { state.theme = b.dataset.mode; state.colors = {}; } stageBg = b.dataset.mode; sync(); });
+  $$('.seg[data-key]').forEach((seg) => seg.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; state[seg.dataset.key] = b.dataset.v; if (seg.dataset.key === 'type' && b.dataset.v !== 'card' && ['cream', 'espresso'].includes(stageBg)) stageBg = 'light'; sync(); if (seg.dataset.key === 'timeframe') { tiles(); if (quote) load(); } });
+  $$('#stageBg button').forEach((b) => b.onclick = () => { stageBg = b.dataset.bg; sync(); });
+  $$('select[data-key]').forEach((s) => s.onchange = () => { state[s.dataset.key] = s.value; if (s.dataset.key === 'theme') { state.colors = {}; stageBg = VIEW[s.value] === 'split' ? 'light' : VIEW[s.value]; } sync(); });
+  $('#label').oninput = (e) => { state.label = e.target.value; clearTimeout(window.lt); window.lt = setTimeout(sync, 250); };
+  $$('[data-label]').forEach((c) => c.onclick = () => { state.label = c.dataset.label; sync(); });
+  $$('[data-key=hideBorder],[data-key=nologo]').forEach((c) => c.onchange = () => { state[c.dataset.key] = c.checked; sync(); });
+  $$('[data-color]').forEach((i) => i.oninput = () => { state.colors[i.dataset.color] = i.value; clearTimeout(window.ct); window.ct = setTimeout(sync, 150); });
+  $('#resetAll').onclick = () => { Object.assign(state, DEFAULTS, { colors: {}, theme: document.documentElement.dataset.theme }); stageBg = state.theme; sync(); };
+  $$('.tabs button').forEach((b) => b.onclick = () => { tab = b.dataset.tab; $$('.tabs button').forEach((x) => x.setAttribute('aria-selected', String(x === b))); $('#snippet').textContent = snippet(); });
+  $('#copy').onclick = async () => { try { await navigator.clipboard.writeText($('#snippet').textContent); toast('Copied to clipboard'); } catch { toast('Copy failed, select the text instead'); } };
+  sync();
+  if ($('#token').value) load();
+})();
+</script>
+</body>
+</html>

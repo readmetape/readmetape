@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tape: live coin cards for your README</title>
+<meta name="description" content="tape puts your coin's live price, chart and mcap on your README as a plain SVG card, refreshed by a GitHub Action. CLI, MCP server and local preview included. Zero dependencies.">
+<meta name="theme-color" content="#F6F1E8">
+<meta property="og:image" content="https://readmetape.com/preview.png">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+@font-face { font-family: "Fraunces"; src: url(fonts/fraunces-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url(fonts/fraunces-latin-600-normal.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url(fonts/fraunces-latin-400-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Fragment Mono"; src: url(fonts/fragment-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+:root {
+  --bg: #F6F1E8; --card: #FFFDF8; --raised: #EFE7D9; --line: #E2D7C3; --line-strong: #D3C5AC;
+  --text: #1C1914; --muted: #7A6F5E; --accent: #F29E1F; --accent-text: #9A5B00; --on-accent: #1C1914;
+  --up: #2E7D4F; --down: #B3402E; --focus: rgba(242,158,31,.45);
+  --ink: #17120C; --ink-card: #211A12; --ink-line: #3A2F22; --ink-text: #F3EADB; --ink-muted: #A39580;
+  --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --mono: "Fragment Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --r: 6px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 18px/1.6 var(--serif); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { color: var(--accent-text); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+code, pre, .mono, .caps, .btn { font-family: var(--mono); font-variant-ligatures: none; }
+code { font-size: .82em; background: var(--raised); border-radius: 4px; padding: 1px 6px; }
+.caps { font-size: 11px; line-height: 1.4; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 48px; }
+svg.card { width: 100%; max-width: 495px; height: auto; display: block; }
+
+nav .wrap { display: flex; align-items: center; gap: 12px; height: 72px; border-bottom: 1px solid var(--line); }
+nav img { width: 28px; height: 28px; display: block; }
+nav .word { font: 600 26px/1 var(--serif); letter-spacing: -.02em; text-decoration: none; }
+nav .links { margin-left: auto; display: flex; gap: 32px; }
+nav .links a { font: 400 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+nav .links a:hover { color: var(--text); }
+
+.lede { font-size: 20px; line-height: 1.5; color: var(--muted); font-style: italic; max-width: 520px; margin: 0; }
+.install { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 8px 8px 8px 16px; max-width: 520px; }
+.install .p { color: var(--accent-text); font: 400 15px var(--mono); }
+.install code { flex: 1; min-width: 0; background: none; padding: 0; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn { font-size: 13px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--r); border: 1px solid var(--line-strong); background: var(--card); color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); color: var(--text); }
+.btn.sm { height: 32px; padding: 0 12px; font-size: 12px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.05); color: var(--on-accent); }
+.btn[disabled] { opacity: .6; cursor: progress; }
+.cta { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The builder: prose and controls on the left, the product on the right. */
+.tool { display: grid; grid-template-columns: minmax(0, 1fr) 527px; column-gap: 64px; padding: 48px 0 96px; align-items: start; }
+.col-l, .col-r { display: grid; gap: 32px; align-content: start; min-width: 0; }
+.t-embed { grid-column: 1 / -1; }
+.tool h1 { font: 600 64px/.98 var(--serif); letter-spacing: -.035em; margin: 16px 0 16px; }
+.tool h1 i { font-weight: 400; }
+
+.t-form label { display: block; margin-bottom: 8px; }
+.field { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 4px; gap: 4px; }
+.field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+.field select, .field input { font: 400 14px var(--mono); font-variant-ligatures: none; color: var(--text); background: transparent; border: 0; outline: 0; min-width: 0; }
+.field select { flex: none; padding: 0 28px 0 12px; border-right: 1px solid var(--line); border-radius: 0; appearance: none; cursor: pointer;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237A6F5E' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.field input { flex: 1; padding: 0 12px; height: 44px; }
+.field input::placeholder { color: var(--muted); opacity: .8; }
+.field .btn { height: 44px; padding: 0 20px; }
+.t-form[data-invalid] .field { border-color: var(--down); }
+.hint { margin: 12px 0 0; font-size: 16px; color: var(--muted); }
+.hint a { color: var(--accent-text); }
+
+.t-plate .cap { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+#status[data-s="live"] { color: var(--up); }
+#status[data-s="error"] { color: var(--down); }
+#status[data-s="live"]::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: 1px; }
+.plate { --p-bg: var(--bg); --p-text: var(--text); --p-muted: var(--muted); --p-line: var(--line-strong); --p-bar: rgba(122,111,94,.16);
+  background: var(--p-bg); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; transition: background-color .2s; }
+.plate[data-bg="espresso"] { --p-bg: #17120C; --p-text: #F3EADB; --p-muted: #A39580; --p-line: #3A2F22; --p-bar: rgba(163,149,128,.18); border-color: #17120C; }
+.plate[data-bg="github"] { --p-bg: #FFFFFF; --p-text: #1F2328; --p-muted: #59636E; --p-line: #D1D9E0; --p-bar: rgba(89,99,110,.14); }
+.plate[data-bg="github_dark"] { --p-bg: #0D1117; --p-text: #F0F6FC; --p-muted: #9198A1; --p-line: #3D444D; --p-bar: rgba(145,152,161,.18); border-color: #0D1117; }
+.stage { width: 100%; max-width: 495px; aspect-ratio: 495 / 195; margin: 0 auto; display: grid; place-items: center; color: var(--p-text); }
+.stage > svg { display: block; max-width: 100%; height: auto; }
+.stage > svg[width="495"] { width: 100%; }
+.stage[data-state="example"] > svg { opacity: .92; }
+.under { margin-top: 8px; }
+.note { margin: 8px 0 0; font-size: 15px; line-height: 1.45; color: var(--muted); font-style: italic; min-height: 44px; }
+.note[data-tone="warn"] { color: var(--accent-text); font-style: normal; }
+.backs { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+.backs button, .seg button, .tabs button { font: 400 11px/1 var(--mono); letter-spacing: .04em; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: var(--r); padding: 6px 8px; cursor: pointer; }
+.backs button:hover, .seg button:hover, .tabs button:hover { color: var(--text); }
+.backs button[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--card); }
+
+/* skeleton, error */
+.skel { position: relative; width: 100%; height: 100%; border: 1px solid var(--p-line); border-radius: var(--r); overflow: hidden; }
+.skel i { position: absolute; display: block; background: var(--p-bar); border-radius: 3px; }
+.skel .a { left: 4.8%; top: 12.3%; width: 8.1%; aspect-ratio: 1; border-radius: 50%; }
+.skel .b { left: 15.4%; top: 14%; width: 22%; height: 9%; }
+.skel .c { left: 15.4%; top: 27%; width: 34%; height: 6%; }
+.skel .d { right: 4.8%; top: 13%; width: 20%; height: 12%; }
+.skel .e { left: 4.8%; right: 4.8%; top: 46%; height: 26%; border-radius: 4px; }
+.skel .f { left: 4.8%; bottom: 9%; width: 54%; height: 6%; }
+.skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%); transform: translateX(-100%); animation: sweep 1.2s ease-in-out infinite; }
+.plate[data-bg="espresso"] .skel::after, .plate[data-bg="github_dark"] .skel::after { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.06) 50%, transparent 70%); }
+@keyframes sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
+.err { width: 100%; height: 100%; border: 1px dashed var(--p-line); border-radius: var(--r); padding: 24px; display: grid; align-content: center; gap: 8px; text-align: left; }
+.err b { font: 600 22px/1.2 var(--serif); letter-spacing: -.02em; }
+.err p { margin: 0; font-size: 16px; line-height: 1.45; color: var(--p-muted); max-width: 420px; }
+.err .caps { color: #B3402E; }
+.plate[data-bg="espresso"] .err .caps, .plate[data-bg="github_dark"] .err .caps { color: #E07A64; }
+.err a { color: inherit; }
+
+/* controls */
+.t-controls { border-top: 1px solid var(--text); }
+.t-controls .row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.t-controls .row.look { min-height: 81px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.segs { display: flex; flex-wrap: wrap; gap: 4px 24px; }
+.seg button { font-size: 12px; padding: 8px 10px; border-color: var(--line); background: var(--card); color: var(--text); }
+.seg button:hover { border-color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--card); }
+.t-controls input { font: 400 13px var(--mono); font-variant-ligatures: none; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); color: var(--text); width: 100%; max-width: 320px; outline: 0; }
+.t-controls input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); }
+[hidden] { display: none !important; }
+
+/* numbers */
+dl.nums { margin: 0; }
+dl.nums div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); min-height: 49px; }
+dl.nums dt { font: 400 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+dl.nums dd { margin: 0; font: 400 15px/1.6 var(--mono); font-variant-numeric: tabular-nums; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dl.nums dd.key { color: var(--accent-text); }
+dl.nums dd.up { color: var(--up); } dl.nums dd.down { color: var(--down); }
+dl.nums dd.wait { color: transparent; background: rgba(122,111,94,.14); border-radius: 3px; width: 88px; height: 16px; }
+dl.nums dd a { color: inherit; }
+.fine { margin: 12px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); font-style: italic; }
+
+/* embed */
+.t-embed { border-top: 1px solid var(--line); padding-top: 32px; margin-top: 48px; }
+.embed-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.t-embed h2 { font-size: 36px; margin: 0; }
+.tabs { display: flex; gap: 4px; border: 1px solid var(--line); border-radius: var(--r); padding: 4px; background: var(--card); }
+.tabs button { font-size: 12px; padding: 8px 12px; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+.why { margin: 0 0 16px; font-size: 17px; color: var(--muted); max-width: 720px; }
+.why.sm { font-size: 15px; margin: 12px 0 0; }
+.snips { display: grid; gap: 16px; }
+.snips.two { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+.snip-h { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.snip-h .acts { display: flex; gap: 8px; }
+.snip pre { padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.snip pre.yaml { white-space: pre; word-break: normal; }
+
+section.ch { border-top: 1px solid var(--line); padding: 96px 0; }
+.ch-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 64px; align-items: start; }
+.num { font: 400 12px var(--mono); letter-spacing: .08em; color: var(--accent-text); }
+h2 { font: 600 48px/1.05 var(--serif); letter-spacing: -.03em; margin: 16px 0 24px; max-width: 680px; }
+h2 i { font-weight: 400; }
+.prose p { margin: 0 0 24px; max-width: 640px; }
+.prose p.muted { color: var(--muted); }
+aside h3 { font: 400 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--text); }
+dl.ledger { margin: 0; }
+dl.ledger div { display: grid; grid-template-columns: 112px 1fr; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+dl.ledger dt { font: 400 13px/1.6 var(--mono); }
+dl.ledger dd { margin: 0; font-size: 16px; line-height: 1.5; color: var(--muted); }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 48px; }
+.pair figure { margin: 0; border-radius: var(--r); padding: 32px 24px; display: grid; gap: 16px; justify-items: center; border: 1px solid var(--line); }
+.pair figure.cream { background: var(--bg); } .pair figure.ink { background: var(--ink); border-color: var(--ink); }
+.pair figcaption { width: 100%; max-width: 495px; display: flex; justify-content: space-between; }
+.pair figure.ink figcaption { color: var(--ink-muted); }
+.themes { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 8px; }
+.themes span { font: 400 12px var(--mono); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 4px 8px; color: var(--muted); }
+
+pre { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 24px; font-size: 14px; line-height: 1.7; overflow-x: auto; color: var(--text); }
+pre .k { color: var(--muted); } pre .s { color: var(--accent-text); }
+.codehead { display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; }
+.term { margin-top: 32px; }
+.term img { width: 100%; height: auto; display: block; }
+ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 40px 1fr; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 16px; line-height: 1.5; }
+ol.steps li::before { content: "0" counter(s); font: 400 12px/1.9 var(--mono); color: var(--accent-text); }
+
+.faq { display: grid; grid-template-columns: 1fr 1fr; gap: 0 64px; margin-top: 48px; }
+.faq div { padding: 24px 0; border-top: 1px solid var(--line); }
+.faq h3 { font: 600 20px/1.3 var(--serif); letter-spacing: -.01em; margin: 0 0 8px; }
+.faq p { margin: 0; color: var(--muted); font-size: 17px; }
+
+.closing { background: var(--ink); color: var(--ink-text); }
+.closing .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 64px; padding-top: 96px; padding-bottom: 96px; align-items: end; }
+.closing h2 { color: var(--ink-text); margin: 16px 0 0; }
+.closing .num { color: var(--accent); }
+.closing .install { background: var(--ink-card); border-color: var(--ink-line); }
+.closing .install code { color: var(--ink-text); }
+.closing .install .p { color: var(--accent); }
+.closing .btn:not(.primary) { background: var(--ink-card); border-color: var(--ink-line); color: var(--ink-text); }
+footer { background: var(--ink); color: var(--ink-muted); }
+footer .wrap { display: flex; justify-content: space-between; gap: 24px; padding-top: 24px; padding-bottom: 48px; border-top: 1px solid var(--ink-line); font-size: 15px; font-style: italic; flex-wrap: wrap; }
+footer a { color: var(--ink-text); }
+
+@media (max-width: 1100px) {
+  .ch-grid, .closing .wrap { grid-template-columns: minmax(0, 1fr); gap: 48px; }
+  .tool { grid-template-columns: minmax(0, 1fr); row-gap: 32px; padding: 48px 0 64px; }
+  .col-l, .col-r { display: contents; }
+  .t-intro { order: 1; } .t-form { order: 2; } .t-plate { order: 3; } .t-controls { order: 4; } .t-numbers { order: 5; } .t-embed { order: 6; }
+  .t-plate, .t-numbers { max-width: 640px; }
+  .pair { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  body { font-size: 17px; }
+  .wrap { padding: 0 16px; }
+  nav .links { gap: 16px; } nav .links a:not(.gh) { display: none; }
+  .tool { padding: 32px 0 64px; row-gap: 24px; }
+  .tool h1 { font-size: 44px; margin: 12px 0; }
+  .lede { font-size: 18px; }
+  .field { flex-wrap: wrap; }
+  .field input { flex: 1 1 100%; order: 1; border-bottom: 1px solid var(--line); }
+  .field select { order: 2; flex: 1 1 auto; height: 44px; border-right: 0; }
+  .field .btn { order: 3; flex: none; }
+  .plate { padding: 12px; }
+  .backs { justify-content: flex-start; }
+  .t-controls .row { grid-template-columns: 1fr; gap: 8px; }
+  .t-controls .row.look { min-height: 0; }
+  .t-controls input { max-width: none; }
+  .t-embed { margin-top: 8px; }
+  .t-embed h2 { font-size: 30px; }
+  .tabs { width: 100%; }
+  .tabs button { flex: 1; padding: 8px 6px; white-space: normal; line-height: 1.3; }
+  .snips.two { grid-template-columns: minmax(0, 1fr); }
+  .err { padding: 16px; } .err b { font-size: 19px; } .err p { font-size: 15px; }
+  section.ch { padding: 64px 0; }
+  h2 { font-size: 34px; }
+  .faq { grid-template-columns: 1fr; }
+  .pair figure { padding: 16px 12px; }
+  pre { padding: 16px; font-size: 13px; }
+  .closing .wrap { padding-top: 64px; padding-bottom: 64px; }
+  .install code { font-size: 13px; }
+  dl.ledger div { grid-template-columns: 1fr; gap: 4px; }
+}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <img src="icon.png" alt=""><a class="word" href="#top">tape</a>
+  <div class="links"><a href="#build">build</a><a href="#card">the card</a><a href="#action">action</a><a href="#mcp">mcp</a><a href="#faq">faq</a><a class="gh" href="https://github.com/OWNER/tape">github</a></div>
+</div></nav>
+
+<main id="top">
+  <div class="wrap">
+    <header class="tool" id="build">
+      <div class="col-l">
+        <div class="t-intro">
+          <div class="caps">v1.1.0 &middot; MIT &middot; zero dependencies &middot; $TAPE</div>
+          <h1>live coin cards <i>for your</i> README.</h1>
+          <p class="lede">paste a token, pick a look, copy one line into your README. the preview is live from DexScreener and GeckoTerminal.</p>
+        </div>
+
+        <form class="t-form" id="form" action="./" method="get" autocomplete="off" novalidate>
+          <label class="caps" for="token">token address</label>
+          <div class="field">
+            <select id="chain" name="chain" aria-label="chain">
+              <option value="solana">solana</option><option value="base">base</option><option value="ethereum">ethereum</option><option value="bsc">bsc</option><option value="arbitrum">arbitrum</option><option value="polygon">polygon</option><option value="avalanche">avalanche</option><option value="optimism">optimism</option>
+            </select>
+            <input id="token" name="token" type="text" placeholder="mint or 0x contract address" spellcheck="false" autocapitalize="off" autocorrect="off" aria-describedby="hint">
+            <button class="btn primary" id="go" type="submit">Build card</button>
+          </div>
+          <p class="hint" id="hint">no address handy? <a id="example" href="?token=DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263">try with an example: $BONK</a></p>
+        </form>
+
+        <div class="t-controls" id="controls">
+          <div class="row">
+            <span class="caps">type</span>
+            <div class="seg" role="group" aria-label="type" data-key="type">
+              <button type="button" data-v="card" aria-pressed="true">card</button><button type="button" data-v="spark" aria-pressed="false">spark</button><button type="button" data-v="badge" aria-pressed="false">badge</button>
+            </div>
+          </div>
+          <div class="row look">
+            <span class="caps" id="look-name">theme</span>
+            <div class="seg chips" role="group" aria-label="theme" data-key="theme" data-for="card">
+              <button type="button" data-v="cream" aria-pressed="true">cream</button><button type="button" data-v="espresso" aria-pressed="false">espresso</button><button type="button" data-v="dark" aria-pressed="false">dark</button><button type="button" data-v="light" aria-pressed="false">light</button><button type="button" data-v="github_dark" aria-pressed="false">github_dark</button><button type="button" data-v="transparent" aria-pressed="false">transparent</button>
+            </div>
+            <div class="seg" role="group" aria-label="badge style" data-key="style" data-for="spark badge" hidden>
+              <button type="button" data-v="flat" aria-pressed="true">flat</button><button type="button" data-v="flat-square" aria-pressed="false">flat-square</button><button type="button" data-v="for-the-badge" aria-pressed="false">for-the-badge</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="caps" id="win-name">window</span>
+            <div class="segs">
+              <div class="seg" role="group" aria-label="timeframe" data-key="timeframe" data-for="card spark">
+                <button type="button" data-v="24h" aria-pressed="true">24h</button><button type="button" data-v="7d" aria-pressed="false">7d</button>
+              </div>
+              <div class="seg" role="group" aria-label="spark metric" data-key="metric" data-for="spark" hidden>
+                <button type="button" data-v="price" aria-pressed="true">price</button><button type="button" data-v="change" aria-pressed="false">change</button>
+              </div>
+              <div class="seg" role="group" aria-label="badge metric" data-key="metric" data-for="badge" hidden>
+                <button type="button" data-v="all" aria-pressed="true">all</button><button type="button" data-v="price" aria-pressed="false">price</button><button type="button" data-v="mcap" aria-pressed="false">mcap</button><button type="button" data-v="change" aria-pressed="false">change</button><button type="button" data-v="volume" aria-pressed="false">volume</button>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <label class="caps" for="label">label</label>
+            <input id="label" type="text" maxlength="40" placeholder="optional, like paid to dev" spellcheck="false">
+          </div>
+        </div>
+      </div>
+      <div class="col-r">
+        <div class="t-plate">
+          <div class="cap"><span class="caps">live preview</span><span class="caps" id="status" data-s="example">example data</span></div>
+          <div class="plate" id="plate" data-bg="cream">
+            <div class="stage" id="stage" data-state="example" aria-live="polite" aria-busy="false"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="495" height="195" viewBox="0 0 495 195" fill="none" role="img" aria-label="$DEMO $0.0042"><title>$DEMO $0.0042</title><rect x=".5" y=".5" width="494" height="194" rx="6" fill="#FFFDF8" stroke="#E2D7C3"/><g font-family="Fraunces,'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif"><clipPath id="pt1dafwbh-a"><circle cx="42" cy="44" r="18"/></clipPath><image x="24" y="26" width="36" height="36" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACWElEQVR4nOXY13ITQRCF4Xk5wGAwOZtocra0ylnOOZBzesieuwNds9o7TBmmV+s6XdUP8P1VKu20+zkr+KFbEnwvCb6VBF91y4IvZcHnsuCTbiL4mAg+JIL3uhXBu4rgbUXwphr2dVXwqip4WQu7WxPs1ATb9bBbdcFmXbDRCLveEKw1w642BStNwXIr7FJLsNgSLLTDzrcFc23BsBN20BH0O4JeN2y3K+j0BO10Wz1Bsy9opFvvC2oDQTXdykCQDAWOGZ8MPRwzvqwBmPGlOQ/HjJ/VAMz4EIAY/0IDMOOfz3s4ZvwzDcCMDwGI8U81ADP+yYKHY8Y/1gDM+BCAGP9IAzDjHy56uHHg95o88Q80QJ74/Uwe+CyANf5/xhJ/f8nDFRk/Giv8PQ1QdPxoLPB3NUBRfvN/Gwt8FqDo+NHExt9Z9nDj+Kv714mNn9EABwU/mpj42xrA4gvPcmLiswCxP28tJyb+1oqHs/i2t5yY+JsawOJhYx0gFv6GBrB41VlOTHwWIPaT1nJi4q+vejir9/xBwF/TAFbHDIuJjZ8eBbC65BQdP73m4SzPWLEDxMZf1QDWN7wi469ogDwOmEXFZwHyut7uF26Nv7zu4cZxut5rLP7q/oS/pAGKfre3xF/UAMz4LAAr/sKGh2PGn9cAzPhzGoAZnwVgxZ/d9HDM+DMagBl/WgMw47MArPhTWx6OGX9SAzDjpzQAM35qOw3Aij+hAZjxxzUAM35SAzDjJ3fSAKz4YxqAGX9UAzDjJzQAM35iNw3Aij+iAZjxhzUAM/7Q7wC/ADUghjuHXjVPAAAAAElFTkSuQmCC" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACWElEQVR4nOXY13ITQRCF4Xk5wGAwOZtocra0ylnOOZBzesieuwNds9o7TBmmV+s6XdUP8P1VKu20+zkr+KFbEnwvCb6VBF91y4IvZcHnsuCTbiL4mAg+JIL3uhXBu4rgbUXwphr2dVXwqip4WQu7WxPs1ATb9bBbdcFmXbDRCLveEKw1w642BStNwXIr7FJLsNgSLLTDzrcFc23BsBN20BH0O4JeN2y3K+j0BO10Wz1Bsy9opFvvC2oDQTXdykCQDAWOGZ8MPRwzvqwBmPGlOQ/HjJ/VAMz4EIAY/0IDMOOfz3s4ZvwzDcCMDwGI8U81ADP+yYKHY8Y/1gDM+BCAGP9IAzDjHy56uHHg95o88Q80QJ74/Uwe+CyANf5/xhJ/f8nDFRk/Giv8PQ1QdPxoLPB3NUBRfvN/Gwt8FqDo+NHExt9Z9nDj+Kv714mNn9EABwU/mpj42xrA4gvPcmLiswCxP28tJyb+1oqHs/i2t5yY+JsawOJhYx0gFv6GBrB41VlOTHwWIPaT1nJi4q+vejir9/xBwF/TAFbHDIuJjZ8eBbC65BQdP73m4SzPWLEDxMZf1QDWN7wi469ogDwOmEXFZwHyut7uF26Nv7zu4cZxut5rLP7q/oS/pAGKfre3xF/UAMz4LAAr/sKGh2PGn9cAzPhzGoAZnwVgxZ/d9HDM+DMagBl/WgMw47MArPhTWx6OGX9SAzDjpzQAM35qOw3Aij+hAZjxxzUAM35SAzDjJ3fSAKz4YxqAGX9UAzDjJzQAM35iNw3Aij+iAZjxhzUAM/7Q7wC/ADUghjuHXjVPAAAAAElFTkSuQmCC" clip-path="url(#pt1dafwbh-a)" preserveAspectRatio="xMidYMid slice"/><circle cx="42" cy="44" r="17.5" stroke="#E2D7C3"/><text x="471" y="45" font-size="22" fill="#1C1914" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$0.0042</text><path d="M403.8 63l4-6 4 6z" fill="#2E7D4F"/><text x="471" y="64" font-size="11.5" fill="#2E7D4F" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">12.4% <tspan fill="#7A6F5E">7d</tspan></text><text x="72" y="44" font-size="21" font-weight="600" fill="#1C1914" letter-spacing="-.01em">$DEMO</text><rect x="159.5" y="30.5" width="79" height="17" rx="3" stroke="#9A5B00" stroke-opacity=".55"/><text x="199" y="42.5" font-size="10" fill="#9A5B00" text-anchor="middle" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace">paid to dev</text><text x="72" y="63" font-size="12.5" font-style="italic" fill="#7A6F5E">Demo Coin · Solana · Raydium</text><path d="M24 80.5H471M24 144.5H471" stroke="#E2D7C3"/><defs><linearGradient id="pt1dafwbh-g" x1="0" y1="92" x2="0" y2="144" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2E7D4F" stop-opacity=".16"/><stop offset="1" stop-color="#2E7D4F" stop-opacity="0"/></linearGradient></defs><path d="M24 128.13H471" stroke="#7A6F5E" stroke-opacity=".45" stroke-dasharray="1 3" stroke-linecap="round"/><path d="M24 128.13C27.63 129.42 31.27 132 34.9 132C38.54 132 42.17 128.43 45.8 128.43C49.44 128.43 53.07 129.29 56.71 129.85C60.34 130.41 63.98 131.81 67.61 131.81C71.24 131.81 74.88 130.06 78.51 129.57C82.15 129.07 85.78 128.83 89.41 128.83C93.05 128.83 96.68 129.66 100.32 129.66C103.95 129.66 107.59 127.93 111.22 127.04C114.85 126.15 118.49 124.95 122.12 124.32C125.76 123.69 129.39 123.83 133.02 123.28C136.66 122.74 140.29 121.72 143.93 121.04C147.56 120.35 151.2 120.04 154.83 119.15C158.46 118.26 162.1 115.71 165.73 115.71C169.37 115.71 173 116.83 176.63 117.11C180.27 117.39 183.9 117.4 187.54 117.4C191.17 117.4 194.8 115.7 198.44 114.87C202.07 114.03 205.71 112.41 209.34 112.41C212.98 112.41 216.61 115.51 220.24 115.51C223.88 115.51 227.51 113.43 231.15 113.25C234.78 113.07 238.41 113.2 242.05 112.89C245.68 112.57 249.32 109.88 252.95 108.63C256.59 107.38 260.22 105.38 263.85 105.38C267.49 105.38 271.12 108.23 274.76 108.23C278.39 108.23 282.02 108.23 285.66 107.71C289.29 107.2 292.93 104.64 296.56 103.64C300.2 102.64 303.83 102.27 307.46 101.7C311.1 101.13 314.73 100.58 318.37 100.24C322 99.89 325.63 100.15 329.27 99.45C332.9 98.75 336.54 96.93 340.17 95.69C343.8 94.45 347.44 92 351.07 92C354.71 92 358.34 92.84 361.98 93.36C365.61 93.89 369.24 95.15 372.88 95.15C376.51 95.15 380.15 92.36 383.78 92.36C387.41 92.36 391.05 93.39 394.68 94.33C398.32 95.26 401.95 96.99 405.59 97.99C409.22 98.99 412.85 99.76 416.49 100.36C420.12 100.95 423.76 100.97 427.39 101.58C431.02 102.19 434.66 104.03 438.29 104.03C441.93 104.03 445.56 100.77 449.2 100.77C452.83 100.77 456.46 100.93 460.1 100.93C463.73 100.93 467.37 100.02 471 99.57L471 144L24 144Z" fill="url(#pt1dafwbh-g)"/><path d="M24 128.13C27.63 129.42 31.27 132 34.9 132C38.54 132 42.17 128.43 45.8 128.43C49.44 128.43 53.07 129.29 56.71 129.85C60.34 130.41 63.98 131.81 67.61 131.81C71.24 131.81 74.88 130.06 78.51 129.57C82.15 129.07 85.78 128.83 89.41 128.83C93.05 128.83 96.68 129.66 100.32 129.66C103.95 129.66 107.59 127.93 111.22 127.04C114.85 126.15 118.49 124.95 122.12 124.32C125.76 123.69 129.39 123.83 133.02 123.28C136.66 122.74 140.29 121.72 143.93 121.04C147.56 120.35 151.2 120.04 154.83 119.15C158.46 118.26 162.1 115.71 165.73 115.71C169.37 115.71 173 116.83 176.63 117.11C180.27 117.39 183.9 117.4 187.54 117.4C191.17 117.4 194.8 115.7 198.44 114.87C202.07 114.03 205.71 112.41 209.34 112.41C212.98 112.41 216.61 115.51 220.24 115.51C223.88 115.51 227.51 113.43 231.15 113.25C234.78 113.07 238.41 113.2 242.05 112.89C245.68 112.57 249.32 109.88 252.95 108.63C256.59 107.38 260.22 105.38 263.85 105.38C267.49 105.38 271.12 108.23 274.76 108.23C278.39 108.23 282.02 108.23 285.66 107.71C289.29 107.2 292.93 104.64 296.56 103.64C300.2 102.64 303.83 102.27 307.46 101.7C311.1 101.13 314.73 100.58 318.37 100.24C322 99.89 325.63 100.15 329.27 99.45C332.9 98.75 336.54 96.93 340.17 95.69C343.8 94.45 347.44 92 351.07 92C354.71 92 358.34 92.84 361.98 93.36C365.61 93.89 369.24 95.15 372.88 95.15C376.51 95.15 380.15 92.36 383.78 92.36C387.41 92.36 391.05 93.39 394.68 94.33C398.32 95.26 401.95 96.99 405.59 97.99C409.22 98.99 412.85 99.76 416.49 100.36C420.12 100.95 423.76 100.97 427.39 101.58C431.02 102.19 434.66 104.03 438.29 104.03C441.93 104.03 445.56 100.77 449.2 100.77C452.83 100.77 456.46 100.93 460.1 100.93C463.73 100.93 467.37 100.02 471 99.57" stroke="#2E7D4F" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="471" cy="99.57" r="3" fill="#FFFDF8" stroke="#2E7D4F" stroke-width="1.5"/><text x="24" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">MARKET CAP</text><text x="24" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$4.2M</text><text x="128" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">LIQUIDITY</text><text x="128" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$250K</text><text x="232" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">VOLUME 24H</text><text x="232" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$1.2M</text><text x="471" y="162" font-size="9" fill="#7A6F5E" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">UPDATED</text><text x="471" y="179" font-size="11" fill="#7A6F5E" text-anchor="end" data-pt="updated" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">14 Oct, 20:18 UTC</text></g></svg></div>
+          </div>
+          <div class="under">
+            <div class="backs" role="group" aria-label="preview background">
+              <button type="button" data-bg="cream" aria-pressed="true">cream</button><button type="button" data-bg="espresso" aria-pressed="false">espresso</button><button type="button" data-bg="github" aria-pressed="false">github</button><button type="button" data-bg="github_dark" aria-pressed="false">github dark</button>
+            </div>
+            <p class="note" id="note">example data from the test fixtures. paste a token to see yours.</p>
+          </div>
+        </div>
+
+        <aside class="t-numbers" aria-labelledby="nums-h">
+          <h3 id="nums-h">the numbers</h3>
+          <dl class="nums" id="nums">
+            <div><dt>price</dt><dd data-k="price">--</dd></div>
+            <div><dt id="chg-name">change 24h</dt><dd data-k="change">--</dd></div>
+            <div><dt id="mcap-name">market cap</dt><dd data-k="mcap">--</dd></div>
+            <div><dt>liquidity</dt><dd data-k="liq">--</dd></div>
+            <div><dt>volume 24h</dt><dd data-k="vol">--</dd></div>
+            <div><dt>pair</dt><dd data-k="pair">--</dd></div>
+          </dl>
+          <p class="fine" id="source">prices from DexScreener, charts from GeckoTerminal. market data only, not financial advice.</p>
+        </aside>
+      </div>
+
+      <section class="t-embed" id="embed" aria-labelledby="embed-h">
+        <div class="embed-head">
+          <h2 id="embed-h">put it in your README.</h2>
+          <div class="tabs" role="tablist" aria-label="embed options">
+            <button type="button" role="tab" id="tab-hosted" aria-selected="true" aria-controls="p-hosted">hosted URL (one line)</button><button type="button" role="tab" id="tab-action" aria-selected="false" aria-controls="p-action" tabindex="-1">GitHub Action (self-hosted)</button>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-hosted" aria-labelledby="tab-hosted">
+          <p class="why">one line of markdown, nothing to install. readmetape.com renders the image with tape's own renderer when someone opens your README, and the CDN keeps it for 5 minutes.</p>
+          <div class="snips">
+            <div class="snip"><div class="snip-h"><span class="caps">README.md</span><button class="btn sm" type="button" data-copy="md-hosted">Copy</button></div><pre id="md-hosted">[![coin price card](https://readmetape.com/api/card?chain=solana&amp;token=YOUR_TOKEN_ADDRESS&amp;theme=cream)](https://dexscreener.com/solana/YOUR_TOKEN_ADDRESS)</pre></div>
+            <div class="snip"><div class="snip-h"><span class="caps">image URL</span><span class="acts"><a class="btn sm" id="open-hosted" href="api/card?chain=solana&amp;token=YOUR_TOKEN_ADDRESS&amp;theme=cream" target="_blank" rel="noopener">Open</a><button class="btn sm" type="button" data-copy="url-hosted">Copy</button></span></div><pre id="url-hosted">https://readmetape.com/api/card?chain=solana&amp;token=YOUR_TOKEN_ADDRESS&amp;theme=cream</pre></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-action" aria-labelledby="tab-action" hidden>
+          <p class="why">the SVG lives in your repo and your own workflow refreshes it every 30 minutes, committing only when a number moved. nothing third party at view time.</p>
+          <div class="snips two">
+            <div class="snip"><div class="snip-h"><span class="caps">.github/workflows/tape.yml</span><button class="btn sm" type="button" data-copy="yaml-action">Copy</button></div><pre id="yaml-action" class="yaml"></pre></div>
+            <div class="snip"><div class="snip-h"><span class="caps">README.md</span><button class="btn sm" type="button" data-copy="md-action">Copy</button></div><pre id="md-action">[![coin price card](.github/tape.svg)](https://dexscreener.com/solana/YOUR_TOKEN_ADDRESS)</pre>
+              <p class="why sm">run the workflow once from the Actions tab so <code>.github/tape.svg</code> exists.</p></div>
+          </div>
+        </div>
+      </section>
+    </header>
+  </div>
+
+  <section class="ch" id="card"><div class="wrap">
+    <div class="ch-grid">
+      <div class="prose">
+        <div class="num">01, THE CARD</div>
+        <h2>one card, <i>everything a holder checks first.</i></h2>
+        <p>logo, symbol, chain and DEX, price, the change over 24h or 7d, a real chart from GeckoTerminal candles, market cap, liquidity and 24h volume. drawn as a plain SVG, so GitHub shows it as is.</p>
+        <p class="muted">no scripts, no external requests, the token logo inlined as a data URI. GitHub's image proxy has nothing to block.</p>
+        <div class="themes"><span>cream</span><span>espresso</span><span>dark</span><span>light</span><span>github_dark</span><span>transparent</span></div>
+      </div>
+      <aside>
+        <h3>What ships</h3>
+        <dl class="ledger">
+          <div><dt>card</dt><dd>the full 495 x 195 card, six themes, any colour overridable.</dd></div>
+          <div><dt>spark</dt><dd>a shields-style badge with a 24h or 7d sparkline.</dd></div>
+          <div><dt>badge</dt><dd>price, mcap, change or volume in flat, flat-square or for-the-badge.</dd></div>
+          <div><dt>grid</dt><dd>several coins in one SVG, two columns by default.</dd></div>
+        </dl>
+      </aside>
+    </div>
+    <div class="pair">
+      <figure class="cream"><svg class="card" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="495" height="195" viewBox="0 0 495 195" fill="none" role="img" aria-label="$DEMO $0.0042"><title>$DEMO $0.0042</title><rect x=".5" y=".5" width="494" height="194" rx="6" fill="#FFFDF8" stroke="#E2D7C3"/><g font-family="Fraunces,'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif"><clipPath id="ptuinjbm-a"><circle cx="42" cy="44" r="18"/></clipPath><image x="24" y="26" width="36" height="36" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACWElEQVR4nOXY13ITQRCF4Xk5wGAwOZtocra0ylnOOZBzesieuwNds9o7TBmmV+s6XdUP8P1VKu20+zkr+KFbEnwvCb6VBF91y4IvZcHnsuCTbiL4mAg+JIL3uhXBu4rgbUXwphr2dVXwqip4WQu7WxPs1ATb9bBbdcFmXbDRCLveEKw1w642BStNwXIr7FJLsNgSLLTDzrcFc23BsBN20BH0O4JeN2y3K+j0BO10Wz1Bsy9opFvvC2oDQTXdykCQDAWOGZ8MPRwzvqwBmPGlOQ/HjJ/VAMz4EIAY/0IDMOOfz3s4ZvwzDcCMDwGI8U81ADP+yYKHY8Y/1gDM+BCAGP9IAzDjHy56uHHg95o88Q80QJ74/Uwe+CyANf5/xhJ/f8nDFRk/Giv8PQ1QdPxoLPB3NUBRfvN/Gwt8FqDo+NHExt9Z9nDj+Kv714mNn9EABwU/mpj42xrA4gvPcmLiswCxP28tJyb+1oqHs/i2t5yY+JsawOJhYx0gFv6GBrB41VlOTHwWIPaT1nJi4q+vejir9/xBwF/TAFbHDIuJjZ8eBbC65BQdP73m4SzPWLEDxMZf1QDWN7wi469ogDwOmEXFZwHyut7uF26Nv7zu4cZxut5rLP7q/oS/pAGKfre3xF/UAMz4LAAr/sKGh2PGn9cAzPhzGoAZnwVgxZ/d9HDM+DMagBl/WgMw47MArPhTWx6OGX9SAzDjpzQAM35qOw3Aij+hAZjxxzUAM35SAzDjJ3fSAKz4YxqAGX9UAzDjJzQAM35iNw3Aij+iAZjxhzUAM/7Q7wC/ADUghjuHXjVPAAAAAElFTkSuQmCC" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACWElEQVR4nOXY13ITQRCF4Xk5wGAwOZtocra0ylnOOZBzesieuwNds9o7TBmmV+s6XdUP8P1VKu20+zkr+KFbEnwvCb6VBF91y4IvZcHnsuCTbiL4mAg+JIL3uhXBu4rgbUXwphr2dVXwqip4WQu7WxPs1ATb9bBbdcFmXbDRCLveEKw1w642BStNwXIr7FJLsNgSLLTDzrcFc23BsBN20BH0O4JeN2y3K+j0BO10Wz1Bsy9opFvvC2oDQTXdykCQDAWOGZ8MPRwzvqwBmPGlOQ/HjJ/VAMz4EIAY/0IDMOOfz3s4ZvwzDcCMDwGI8U81ADP+yYKHY8Y/1gDM+BCAGP9IAzDjHy56uHHg95o88Q80QJ74/Uwe+CyANf5/xhJ/f8nDFRk/Giv8PQ1QdPxoLPB3NUBRfvN/Gwt8FqDo+NHExt9Z9nDj+Kv714mNn9EABwU/mpj42xrA4gvPcmLiswCxP28tJyb+1oqHs/i2t5yY+JsawOJhYx0gFv6GBrB41VlOTHwWIPaT1nJi4q+vejir9/xBwF/TAFbHDIuJjZ8eBbC65BQdP73m4SzPWLEDxMZf1QDWN7wi469ogDwOmEXFZwHyut7uF26Nv7zu4cZxut5rLP7q/oS/pAGKfre3xF/UAMz4LAAr/sKGh2PGn9cAzPhzGoAZnwVgxZ/d9HDM+DMagBl/WgMw47MArPhTWx6OGX9SAzDjpzQAM35qOw3Aij+hAZjxxzUAM35SAzDjJ3fSAKz4YxqAGX9UAzDjJzQAM35iNw3Aij+iAZjxhzUAM/7Q7wC/ADUghjuHXjVPAAAAAElFTkSuQmCC" clip-path="url(#ptuinjbm-a)" preserveAspectRatio="xMidYMid slice"/><circle cx="42" cy="44" r="17.5" stroke="#E2D7C3"/><text x="471" y="45" font-size="22" fill="#1C1914" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$0.0042</text><path d="M396.9 63l4-6 4 6z" fill="#2E7D4F"/><text x="471" y="64" font-size="11.5" fill="#2E7D4F" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">12.4% <tspan fill="#7A6F5E">24h</tspan></text><text x="72" y="44" font-size="21" font-weight="600" fill="#1C1914" letter-spacing="-.01em">$DEMO</text><text x="72" y="63" font-size="12.5" font-style="italic" fill="#7A6F5E">Demo Coin · Solana · Raydium</text><path d="M24 80.5H471M24 144.5H471" stroke="#E2D7C3"/><defs><linearGradient id="ptuinjbm-g" x1="0" y1="92" x2="0" y2="144" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2E7D4F" stop-opacity=".16"/><stop offset="1" stop-color="#2E7D4F" stop-opacity="0"/></linearGradient></defs><path d="M24 128.99H471" stroke="#7A6F5E" stroke-opacity=".45" stroke-dasharray="1 3" stroke-linecap="round"/><path d="M24 128.99C25.57 129.99 27.14 132 28.71 132C30.27 132 31.84 129.13 33.41 129.13C34.98 129.13 36.55 129.77 38.12 130.2C39.68 130.63 41.25 131.7 42.82 131.7C44.39 131.7 45.96 130.29 47.53 129.88C49.09 129.47 50.66 129.24 52.23 129.24C53.8 129.24 55.37 129.85 56.94 129.85C58.51 129.85 60.07 128.45 61.64 127.72C63.21 127 64.78 126.03 66.35 125.52C67.92 125 69.48 125.1 71.05 124.64C72.62 124.19 74.19 123.37 75.76 122.81C77.33 122.25 78.89 121.99 80.46 121.26C82.03 120.54 83.6 118.48 85.17 118.48C86.74 118.48 88.31 119.36 89.87 119.54C91.44 119.71 93.01 119.71 94.58 119.71C96.15 119.71 97.72 118.33 99.28 117.65C100.85 116.97 102.42 115.65 103.99 115.65C105.56 115.65 107.13 118.06 108.69 118.06C110.26 118.06 111.83 116.38 113.4 116.21C114.97 116.04 116.54 116.16 118.11 115.86C119.67 115.57 121.24 113.44 122.81 112.42C124.38 111.41 125.95 109.79 127.52 109.79C129.08 109.79 130.65 112 132.22 112C133.79 112 135.36 112 136.93 111.53C138.49 111.06 140.06 109.05 141.63 108.23C143.2 107.42 144.77 107.1 146.34 106.63C147.91 106.16 149.47 105.72 151.04 105.41C152.61 105.1 154.18 105.34 155.75 104.73C157.32 104.12 158.88 102.68 160.45 101.68C162.02 100.67 163.59 98.67 165.16 98.67C166.73 98.67 168.29 99.31 169.86 99.7C171.43 100.1 173 101.07 174.57 101.07C176.14 101.07 177.71 98.78 179.27 98.78C180.84 98.78 182.41 99.57 183.98 100.3C185.55 101.03 187.12 102.38 188.68 103.16C190.25 103.95 191.82 104.54 193.39 105C194.96 105.46 196.53 105.45 198.09 105.92C199.66 106.39 201.23 107.82 202.8 107.82C204.37 107.82 205.94 105.16 207.51 105.16C209.07 105.16 210.64 105.23 212.21 105.23C213.78 105.23 215.35 104.65 216.92 104.08C218.48 103.52 220.05 101.85 221.62 101.85C223.19 101.85 224.76 104.6 226.33 105.57C227.89 106.54 229.46 107.64 231.03 107.69C232.6 107.74 234.17 107.73 235.74 107.74C237.31 107.75 238.87 107.91 240.44 108.14C242.01 108.37 243.58 108.54 245.15 109.12C246.72 109.71 248.28 111.67 249.85 111.67C251.42 111.67 252.99 109.14 254.56 109.14C256.13 109.14 257.69 111.8 259.26 112.56C260.83 113.33 262.4 113.33 263.97 113.74C265.54 114.14 267.11 115 268.67 115C270.24 115 271.81 114.64 273.38 113.99C274.95 113.34 276.52 111.21 278.08 111.11C279.65 111.01 281.22 111.01 282.79 111.01C284.36 111.01 285.93 112.83 287.49 113.27C289.06 113.71 290.63 113.51 292.2 113.8C293.77 114.08 295.34 114.76 296.91 115.09C298.47 115.42 300.04 115.63 301.61 115.76C303.18 115.9 304.75 115.81 306.32 115.96C307.88 116.11 309.45 116.73 311.02 116.73C312.59 116.73 314.16 116.4 315.73 116.08C317.29 115.76 318.86 114.82 320.43 114.82C322 114.82 323.57 116.11 325.14 116.11C326.71 116.11 328.27 112.97 329.84 112.74C331.41 112.5 332.98 112.64 334.55 112.41C336.12 112.19 337.68 110.02 339.25 109.22C340.82 108.41 342.39 108.13 343.96 107.57C345.53 107.02 347.09 106.32 348.66 105.91C350.23 105.49 351.8 105.34 353.37 105.07C354.94 104.8 356.51 104.79 358.07 104.31C359.64 103.84 361.21 103.22 362.78 102.21C364.35 101.2 365.92 98.25 367.48 98.25C369.05 98.25 370.62 98.32 372.19 98.32C373.76 98.32 375.33 96.08 376.89 96.08C378.46 96.08 380.03 97.3 381.6 97.3C383.17 97.3 384.74 96.05 386.31 96.05C387.87 96.05 389.44 96.4 391.01 96.62C392.58 96.85 394.15 97.21 395.72 97.4C397.28 97.59 398.85 97.77 400.42 97.77C401.99 97.77 403.56 96.15 405.13 95.19C406.69 94.22 408.26 92 409.83 92C411.4 92 412.97 94.72 414.54 94.72C416.11 94.72 417.67 92.12 419.24 92.12C420.81 92.12 422.38 94.73 423.95 95.24C425.52 95.75 427.08 95.47 428.65 95.92C430.22 96.36 431.79 97.58 433.36 98.56C434.93 99.53 436.49 101.79 438.06 101.79C439.63 101.79 441.2 98.3 442.77 98.3C444.34 98.3 445.91 100.61 447.47 100.61C449.04 100.61 450.61 99.93 452.18 99.93C453.75 99.93 455.32 102.27 456.88 102.88C458.45 103.49 460.02 103.58 461.59 103.58C463.16 103.58 464.73 103.33 466.29 103.33C467.86 103.33 469.43 105.38 471 106.4L471 144L24 144Z" fill="url(#ptuinjbm-g)"/><path d="M24 128.99C25.57 129.99 27.14 132 28.71 132C30.27 132 31.84 129.13 33.41 129.13C34.98 129.13 36.55 129.77 38.12 130.2C39.68 130.63 41.25 131.7 42.82 131.7C44.39 131.7 45.96 130.29 47.53 129.88C49.09 129.47 50.66 129.24 52.23 129.24C53.8 129.24 55.37 129.85 56.94 129.85C58.51 129.85 60.07 128.45 61.64 127.72C63.21 127 64.78 126.03 66.35 125.52C67.92 125 69.48 125.1 71.05 124.64C72.62 124.19 74.19 123.37 75.76 122.81C77.33 122.25 78.89 121.99 80.46 121.26C82.03 120.54 83.6 118.48 85.17 118.48C86.74 118.48 88.31 119.36 89.87 119.54C91.44 119.71 93.01 119.71 94.58 119.71C96.15 119.71 97.72 118.33 99.28 117.65C100.85 116.97 102.42 115.65 103.99 115.65C105.56 115.65 107.13 118.06 108.69 118.06C110.26 118.06 111.83 116.38 113.4 116.21C114.97 116.04 116.54 116.16 118.11 115.86C119.67 115.57 121.24 113.44 122.81 112.42C124.38 111.41 125.95 109.79 127.52 109.79C129.08 109.79 130.65 112 132.22 112C133.79 112 135.36 112 136.93 111.53C138.49 111.06 140.06 109.05 141.63 108.23C143.2 107.42 144.77 107.1 146.34 106.63C147.91 106.16 149.47 105.72 151.04 105.41C152.61 105.1 154.18 105.34 155.75 104.73C157.32 104.12 158.88 102.68 160.45 101.68C162.02 100.67 163.59 98.67 165.16 98.67C166.73 98.67 168.29 99.31 169.86 99.7C171.43 100.1 173 101.07 174.57 101.07C176.14 101.07 177.71 98.78 179.27 98.78C180.84 98.78 182.41 99.57 183.98 100.3C185.55 101.03 187.12 102.38 188.68 103.16C190.25 103.95 191.82 104.54 193.39 105C194.96 105.46 196.53 105.45 198.09 105.92C199.66 106.39 201.23 107.82 202.8 107.82C204.37 107.82 205.94 105.16 207.51 105.16C209.07 105.16 210.64 105.23 212.21 105.23C213.78 105.23 215.35 104.65 216.92 104.08C218.48 103.52 220.05 101.85 221.62 101.85C223.19 101.85 224.76 104.6 226.33 105.57C227.89 106.54 229.46 107.64 231.03 107.69C232.6 107.74 234.17 107.73 235.74 107.74C237.31 107.75 238.87 107.91 240.44 108.14C242.01 108.37 243.58 108.54 245.15 109.12C246.72 109.71 248.28 111.67 249.85 111.67C251.42 111.67 252.99 109.14 254.56 109.14C256.13 109.14 257.69 111.8 259.26 112.56C260.83 113.33 262.4 113.33 263.97 113.74C265.54 114.14 267.11 115 268.67 115C270.24 115 271.81 114.64 273.38 113.99C274.95 113.34 276.52 111.21 278.08 111.11C279.65 111.01 281.22 111.01 282.79 111.01C284.36 111.01 285.93 112.83 287.49 113.27C289.06 113.71 290.63 113.51 292.2 113.8C293.77 114.08 295.34 114.76 296.91 115.09C298.47 115.42 300.04 115.63 301.61 115.76C303.18 115.9 304.75 115.81 306.32 115.96C307.88 116.11 309.45 116.73 311.02 116.73C312.59 116.73 314.16 116.4 315.73 116.08C317.29 115.76 318.86 114.82 320.43 114.82C322 114.82 323.57 116.11 325.14 116.11C326.71 116.11 328.27 112.97 329.84 112.74C331.41 112.5 332.98 112.64 334.55 112.41C336.12 112.19 337.68 110.02 339.25 109.22C340.82 108.41 342.39 108.13 343.96 107.57C345.53 107.02 347.09 106.32 348.66 105.91C350.23 105.49 351.8 105.34 353.37 105.07C354.94 104.8 356.51 104.79 358.07 104.31C359.64 103.84 361.21 103.22 362.78 102.21C364.35 101.2 365.92 98.25 367.48 98.25C369.05 98.25 370.62 98.32 372.19 98.32C373.76 98.32 375.33 96.08 376.89 96.08C378.46 96.08 380.03 97.3 381.6 97.3C383.17 97.3 384.74 96.05 386.31 96.05C387.87 96.05 389.44 96.4 391.01 96.62C392.58 96.85 394.15 97.21 395.72 97.4C397.28 97.59 398.85 97.77 400.42 97.77C401.99 97.77 403.56 96.15 405.13 95.19C406.69 94.22 408.26 92 409.83 92C411.4 92 412.97 94.72 414.54 94.72C416.11 94.72 417.67 92.12 419.24 92.12C420.81 92.12 422.38 94.73 423.95 95.24C425.52 95.75 427.08 95.47 428.65 95.92C430.22 96.36 431.79 97.58 433.36 98.56C434.93 99.53 436.49 101.79 438.06 101.79C439.63 101.79 441.2 98.3 442.77 98.3C444.34 98.3 445.91 100.61 447.47 100.61C449.04 100.61 450.61 99.93 452.18 99.93C453.75 99.93 455.32 102.27 456.88 102.88C458.45 103.49 460.02 103.58 461.59 103.58C463.16 103.58 464.73 103.33 466.29 103.33C467.86 103.33 469.43 105.38 471 106.4" stroke="#2E7D4F" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="471" cy="106.40" r="3" fill="#FFFDF8" stroke="#2E7D4F" stroke-width="1.5"/><text x="24" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">MARKET CAP</text><text x="24" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$4.2M</text><text x="128" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">LIQUIDITY</text><text x="128" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$250K</text><text x="232" y="162" font-size="9" fill="#7A6F5E" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">VOLUME 24H</text><text x="232" y="179" font-size="13" fill="#1C1914" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$1.2M</text><text x="471" y="162" font-size="9" fill="#7A6F5E" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">UPDATED</text><text x="471" y="179" font-size="11" fill="#7A6F5E" text-anchor="end" data-pt="updated" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">14 Oct, 20:18 UTC</text></g></svg><figcaption><span class="caps">cream</span><span class="caps">example data</span></figcaption></figure>
+      <figure class="ink"><svg class="card" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="495" height="195" viewBox="0 0 495 195" fill="none" role="img" aria-label="$RIVET $0.019"><title>$RIVET $0.019</title><rect x=".5" y=".5" width="494" height="194" rx="6" fill="#211A12" stroke="#3A2F22"/><g font-family="Fraunces,'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif"><circle cx="42" cy="44" r="17.5" fill="#2C2318" stroke="#3A2F22"/><text x="42" y="49" font-size="14" font-weight="600" fill="#F3EADB" text-anchor="middle">RI</text><text x="471" y="45" font-size="22" fill="#F3EADB" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$0.019</text><path d="M403.8 57l4 6 4-6z" fill="#E07A64"/><text x="471" y="64" font-size="11.5" fill="#E07A64" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">8.3% <tspan fill="#A39580">24h</tspan></text><text x="72" y="44" font-size="21" font-weight="600" fill="#F3EADB" letter-spacing="-.01em">$RIVET</text><text x="72" y="63" font-size="12.5" font-style="italic" fill="#A39580">Rivet Protocol · Base · Aerodrome</text><path d="M24 80.5H471M24 144.5H471" stroke="#3A2F22"/><defs><linearGradient id="pt1llnd88-g" x1="0" y1="92" x2="0" y2="144" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E07A64" stop-opacity=".16"/><stop offset="1" stop-color="#E07A64" stop-opacity="0"/></linearGradient></defs><path d="M24 92.00H471" stroke="#A39580" stroke-opacity=".45" stroke-dasharray="1 3" stroke-linecap="round"/><path d="M24 92C25.57 93.69 27.14 96.19 28.71 97.06C30.27 97.94 31.84 97.6 33.41 98.05C34.98 98.51 36.55 99.69 38.12 100.21C39.68 100.73 41.25 101.19 42.82 101.19C44.39 101.19 45.96 100.45 47.53 99.91C49.09 99.37 50.66 97.95 52.23 97.95C53.8 97.95 55.37 99.85 56.94 101.03C58.51 102.21 60.07 103.72 61.64 105.03C63.21 106.35 64.78 108.91 66.35 108.91C67.92 108.91 69.48 105.37 71.05 105.37C72.62 105.37 74.19 108.08 75.76 108.08C77.33 108.08 78.89 107.16 80.46 106.84C82.03 106.53 83.6 106.22 85.17 106.22C86.74 106.22 88.31 108.38 89.87 109.32C91.44 110.26 93.01 111.86 94.58 111.86C96.15 111.86 97.72 110.34 99.28 110.34C100.85 110.34 102.42 112.99 103.99 114.28C105.56 115.58 107.13 117.03 108.69 118.12C110.26 119.2 111.83 119.96 113.4 120.77C114.97 121.58 116.54 122.33 118.11 122.99C119.67 123.66 121.24 123.9 122.81 124.79C124.38 125.68 125.95 128.34 127.52 128.34C129.08 128.34 130.65 126.57 132.22 125.65C133.79 124.72 135.36 123.26 136.93 122.78C138.49 122.3 140.06 122.46 141.63 122.27C143.2 122.08 144.77 121.45 146.34 121.45C147.91 121.45 149.47 123.5 151.04 123.5C152.61 123.5 154.18 119.38 155.75 119.38C157.32 119.38 158.88 120.81 160.45 121.86C162.02 122.92 163.59 125.71 165.16 125.71C166.73 125.71 168.29 123.97 169.86 123.97C171.43 123.97 173 126.32 174.57 126.32C176.14 126.32 177.71 124.24 179.27 124.24C180.84 124.24 182.41 126.85 183.98 128.01C185.55 129.17 187.12 131.21 188.68 131.21C190.25 131.21 191.82 128.68 193.39 127.61C194.96 126.55 196.53 124.8 198.09 124.8C199.66 124.8 201.23 127.66 202.8 127.66C204.37 127.66 205.94 124.24 207.51 124.24C209.07 124.24 210.64 128.71 212.21 128.71C213.78 128.71 215.35 128.17 216.92 127.43C218.48 126.7 220.05 124.3 221.62 124.3C223.19 124.3 224.76 127.01 226.33 128.15C227.89 129.29 229.46 131.13 231.03 131.13C232.6 131.13 234.17 127.95 235.74 127.95C237.31 127.95 238.87 131.25 240.44 131.25C242.01 131.25 243.58 129.03 245.15 128.54C246.72 128.05 248.28 128.31 249.85 127.91C251.42 127.5 252.99 125.75 254.56 125.75C256.13 125.75 257.69 127.3 259.26 128.07C260.83 128.85 262.4 129.83 263.97 130.4C265.54 130.96 267.11 131.46 268.67 131.46C270.24 131.46 271.81 130.66 273.38 129.99C274.95 129.32 276.52 127.43 278.08 127.43C279.65 127.43 281.22 131.25 282.79 131.41C284.36 131.57 285.93 131.55 287.49 131.57C289.06 131.59 290.63 132 292.2 132C293.77 132 295.34 130.93 296.91 130.3C298.47 129.66 300.04 128.19 301.61 128.19C303.18 128.19 304.75 130.83 306.32 130.83C307.88 130.83 309.45 129.09 311.02 128.7C312.59 128.3 314.16 128.43 315.73 128.26C317.29 128.08 318.86 128.24 320.43 127.43C322 126.63 323.57 124.42 325.14 122.87C326.71 121.32 328.27 118.47 329.84 118.14C331.41 117.82 332.98 117.98 334.55 117.74C336.12 117.5 337.68 114.35 339.25 114.35C340.82 114.35 342.39 115.83 343.96 115.83C345.53 115.83 347.09 111.94 348.66 111.94C350.23 111.94 351.8 113.88 353.37 113.88C354.94 113.88 356.51 113.17 358.07 113.17C359.64 113.17 361.21 115.75 362.78 115.75C364.35 115.75 365.92 113.1 367.48 111.99C369.05 110.87 370.62 109.78 372.19 109.05C373.76 108.32 375.33 107.59 376.89 107.59C378.46 107.59 380.03 108.05 381.6 108.05C383.17 108.05 384.74 104.43 386.31 104.43C387.87 104.43 389.44 106.59 391.01 107.36C392.58 108.13 394.15 108.52 395.72 109.05C397.28 109.59 398.85 110.56 400.42 110.56C401.99 110.56 403.56 110.5 405.13 110.5C406.69 110.5 408.26 110.67 409.83 111.55C411.4 112.42 412.97 114.38 414.54 115.76C416.11 117.14 417.67 119.82 419.24 119.82C420.81 119.82 422.38 119.69 423.95 118.99C425.52 118.29 427.08 115.61 428.65 115.61C430.22 115.61 431.79 117.56 433.36 118.62C434.93 119.68 436.49 121.98 438.06 121.98C439.63 121.98 441.2 118.72 442.77 117.87C444.34 117.03 445.91 117.26 447.47 116.89C449.04 116.52 450.61 116.4 452.18 115.66C453.75 114.91 455.32 112.42 456.88 112.42C458.45 112.42 460.02 116.93 461.59 117.35C463.16 117.78 464.73 117.78 466.29 117.78C467.86 117.78 469.43 116.64 471 116.08L471 144L24 144Z" fill="url(#pt1llnd88-g)"/><path d="M24 92C25.57 93.69 27.14 96.19 28.71 97.06C30.27 97.94 31.84 97.6 33.41 98.05C34.98 98.51 36.55 99.69 38.12 100.21C39.68 100.73 41.25 101.19 42.82 101.19C44.39 101.19 45.96 100.45 47.53 99.91C49.09 99.37 50.66 97.95 52.23 97.95C53.8 97.95 55.37 99.85 56.94 101.03C58.51 102.21 60.07 103.72 61.64 105.03C63.21 106.35 64.78 108.91 66.35 108.91C67.92 108.91 69.48 105.37 71.05 105.37C72.62 105.37 74.19 108.08 75.76 108.08C77.33 108.08 78.89 107.16 80.46 106.84C82.03 106.53 83.6 106.22 85.17 106.22C86.74 106.22 88.31 108.38 89.87 109.32C91.44 110.26 93.01 111.86 94.58 111.86C96.15 111.86 97.72 110.34 99.28 110.34C100.85 110.34 102.42 112.99 103.99 114.28C105.56 115.58 107.13 117.03 108.69 118.12C110.26 119.2 111.83 119.96 113.4 120.77C114.97 121.58 116.54 122.33 118.11 122.99C119.67 123.66 121.24 123.9 122.81 124.79C124.38 125.68 125.95 128.34 127.52 128.34C129.08 128.34 130.65 126.57 132.22 125.65C133.79 124.72 135.36 123.26 136.93 122.78C138.49 122.3 140.06 122.46 141.63 122.27C143.2 122.08 144.77 121.45 146.34 121.45C147.91 121.45 149.47 123.5 151.04 123.5C152.61 123.5 154.18 119.38 155.75 119.38C157.32 119.38 158.88 120.81 160.45 121.86C162.02 122.92 163.59 125.71 165.16 125.71C166.73 125.71 168.29 123.97 169.86 123.97C171.43 123.97 173 126.32 174.57 126.32C176.14 126.32 177.71 124.24 179.27 124.24C180.84 124.24 182.41 126.85 183.98 128.01C185.55 129.17 187.12 131.21 188.68 131.21C190.25 131.21 191.82 128.68 193.39 127.61C194.96 126.55 196.53 124.8 198.09 124.8C199.66 124.8 201.23 127.66 202.8 127.66C204.37 127.66 205.94 124.24 207.51 124.24C209.07 124.24 210.64 128.71 212.21 128.71C213.78 128.71 215.35 128.17 216.92 127.43C218.48 126.7 220.05 124.3 221.62 124.3C223.19 124.3 224.76 127.01 226.33 128.15C227.89 129.29 229.46 131.13 231.03 131.13C232.6 131.13 234.17 127.95 235.74 127.95C237.31 127.95 238.87 131.25 240.44 131.25C242.01 131.25 243.58 129.03 245.15 128.54C246.72 128.05 248.28 128.31 249.85 127.91C251.42 127.5 252.99 125.75 254.56 125.75C256.13 125.75 257.69 127.3 259.26 128.07C260.83 128.85 262.4 129.83 263.97 130.4C265.54 130.96 267.11 131.46 268.67 131.46C270.24 131.46 271.81 130.66 273.38 129.99C274.95 129.32 276.52 127.43 278.08 127.43C279.65 127.43 281.22 131.25 282.79 131.41C284.36 131.57 285.93 131.55 287.49 131.57C289.06 131.59 290.63 132 292.2 132C293.77 132 295.34 130.93 296.91 130.3C298.47 129.66 300.04 128.19 301.61 128.19C303.18 128.19 304.75 130.83 306.32 130.83C307.88 130.83 309.45 129.09 311.02 128.7C312.59 128.3 314.16 128.43 315.73 128.26C317.29 128.08 318.86 128.24 320.43 127.43C322 126.63 323.57 124.42 325.14 122.87C326.71 121.32 328.27 118.47 329.84 118.14C331.41 117.82 332.98 117.98 334.55 117.74C336.12 117.5 337.68 114.35 339.25 114.35C340.82 114.35 342.39 115.83 343.96 115.83C345.53 115.83 347.09 111.94 348.66 111.94C350.23 111.94 351.8 113.88 353.37 113.88C354.94 113.88 356.51 113.17 358.07 113.17C359.64 113.17 361.21 115.75 362.78 115.75C364.35 115.75 365.92 113.1 367.48 111.99C369.05 110.87 370.62 109.78 372.19 109.05C373.76 108.32 375.33 107.59 376.89 107.59C378.46 107.59 380.03 108.05 381.6 108.05C383.17 108.05 384.74 104.43 386.31 104.43C387.87 104.43 389.44 106.59 391.01 107.36C392.58 108.13 394.15 108.52 395.72 109.05C397.28 109.59 398.85 110.56 400.42 110.56C401.99 110.56 403.56 110.5 405.13 110.5C406.69 110.5 408.26 110.67 409.83 111.55C411.4 112.42 412.97 114.38 414.54 115.76C416.11 117.14 417.67 119.82 419.24 119.82C420.81 119.82 422.38 119.69 423.95 118.99C425.52 118.29 427.08 115.61 428.65 115.61C430.22 115.61 431.79 117.56 433.36 118.62C434.93 119.68 436.49 121.98 438.06 121.98C439.63 121.98 441.2 118.72 442.77 117.87C444.34 117.03 445.91 117.26 447.47 116.89C449.04 116.52 450.61 116.4 452.18 115.66C453.75 114.91 455.32 112.42 456.88 112.42C458.45 112.42 460.02 116.93 461.59 117.35C463.16 117.78 464.73 117.78 466.29 117.78C467.86 117.78 469.43 116.64 471 116.08" stroke="#E07A64" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="471" cy="116.08" r="3" fill="#211A12" stroke="#E07A64" stroke-width="1.5"/><text x="24" y="162" font-size="9" fill="#A39580" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">MARKET CAP</text><text x="24" y="179" font-size="13" fill="#F3EADB" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$18.7M</text><text x="128" y="162" font-size="9" fill="#A39580" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">LIQUIDITY</text><text x="128" y="179" font-size="13" fill="#F3EADB" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$1.4M</text><text x="232" y="162" font-size="9" fill="#A39580" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">VOLUME 24H</text><text x="232" y="179" font-size="13" fill="#F3EADB" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">$3.9M</text><text x="471" y="162" font-size="9" fill="#A39580" text-anchor="end" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" letter-spacing=".08em">UPDATED</text><text x="471" y="179" font-size="11" fill="#A39580" text-anchor="end" data-pt="updated" font-family="'Fragment Mono',ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace" style="font-variant-numeric:tabular-nums">14 Oct, 20:18 UTC</text></g></svg><figcaption><span class="caps">espresso, falling coin</span><span class="caps">example data</span></figcaption></figure>
+    </div>
+  </div></section>
+
+  <section class="ch" id="action"><div class="wrap">
+    <div class="ch-grid">
+      <div class="prose">
+        <div class="num">02, THE ACTION</div>
+        <h2>a GitHub Action <i>keeps it fresh.</i></h2>
+        <p>drop in the workflow and run it once. it rewrites <code>.github/tape.svg</code> on your schedule and only commits when a number on the card moved. a new timestamp alone never makes a commit.</p>
+        <div class="codehead"><span class="caps">.github/workflows/tape.yml</span></div>
+<pre><span class="k">name:</span> tape
+<span class="k">on:</span>
+  <span class="k">schedule:</span> [{ <span class="k">cron:</span> <span class="s">'*/30 * * * *'</span> }]
+  <span class="k">workflow_dispatch:</span>
+<span class="k">permissions:</span>
+  <span class="k">contents:</span> write
+<span class="k">jobs:</span>
+  <span class="k">tape:</span>
+    <span class="k">runs-on:</span> ubuntu-latest
+    <span class="k">steps:</span>
+      - <span class="k">uses:</span> actions/checkout@v4
+      - <span class="k">uses:</span> OWNER/tape@v1
+        <span class="k">with:</span>
+          <span class="k">tokens:</span> YOUR_TOKEN_ADDRESS
+          <span class="k">theme:</span> cream
+          <span class="k">label:</span> <span class="s">paid to dev</span></pre>
+      </div>
+      <aside>
+        <h3>Three steps</h3>
+        <ol class="steps">
+          <li><span>add the workflow above as <code>.github/workflows/tape.yml</code> and set your token address.</span></li>
+          <li><span>run it once from the Actions tab so <code>.github/tape.svg</code> exists.</span></li>
+          <li><span>put <code>![$COIN](.github/tape.svg)</code> in your README, linked to the chart if you like.</span></li>
+        </ol>
+      </aside>
+    </div>
+    <div class="term"><img src="terminal.svg" alt="terminal session: tape quote and tape --type card, with example data" width="920" height="420"></div>
+  </div></section>
+
+  <section class="ch" id="mcp"><div class="wrap">
+    <div class="ch-grid">
+      <div class="prose">
+        <div class="num">03, FOR AGENTS</div>
+        <h2>ask your agent <i>for a card.</i></h2>
+        <p><code>tape mcp</code> runs a Model Context Protocol server over stdio. Claude Desktop, Claude Code, Cursor and other MCP clients can quote a coin or render a card without leaving the chat.</p>
+        <div class="codehead"><span class="caps">claude_desktop_config.json</span></div>
+<pre>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"tape"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"readme-tape"</span>, <span class="s">"mcp"</span>]
+    }
+  }
+}</pre>
+      </div>
+      <aside>
+        <h3>Four tools</h3>
+        <dl class="ledger">
+          <div><dt>token_quote</dt><dd>price, mcap, liquidity, volume and change.</dd></div>
+          <div><dt>render_card</dt><dd>the card as SVG text, any theme and label.</dd></div>
+          <div><dt>render_badge</dt><dd>a badge or a sparkline badge.</dd></div>
+          <div><dt>chart_points</dt><dd>OHLCV candles for 24h or 7d.</dd></div>
+        </dl>
+      </aside>
+    </div>
+  </div></section>
+
+  <section class="ch" id="faq"><div class="wrap">
+    <div class="num">04, QUESTIONS</div>
+    <h2>the short answers.</h2>
+    <div class="faq">
+      <div><h3>do I need an API key?</h3><p>no. DexScreener and GeckoTerminal both have free public endpoints. tape retries with backoff on rate limits and can keep chart data in a small cache file.</p></div>
+      <div><h3>will GitHub show the token logo?</h3><p>yes. the logo is downloaded at render time (96 KB max) and inlined as a data URI. no usable logo means a monogram.</p></div>
+      <div><h3>how fresh is the data?</h3><p>as fresh as your schedule. GitHub runs scheduled workflows best effort, so a 30 minute cron can run late when GitHub is busy.</p></div>
+      <div><h3>which chains work?</h3><p>any chain DexScreener has prices for. charts work where GeckoTerminal has the pool: Solana, Ethereum, Base, BSC and more.</p></div>
+      <div><h3>why readme-tape on npm?</h3><p>tape on npm is a long-running test runner. the package is readme-tape, the command it installs is tape.</p></div>
+      <div><h3>is this financial advice?</h3><p>no. tape shows public market data in a README. do not trade off it.</p></div>
+    </div>
+  </div></section>
+
+  <section class="closing"><div class="wrap">
+    <div>
+      <div class="num">05, START</div>
+      <h2>one command, <i>one card.</i></h2>
+    </div>
+    <div>
+      <div class="install"><span class="p">$</span><code>npx readme-tape ui &lt;mint&gt;</code></div>
+      <div class="cta"><a class="btn primary" href="#build">Build a card</a><a class="btn" href="https://github.com/OWNER/tape">View on GitHub</a></div>
+    </div>
+  </div></section>
+</main>
+<footer><div class="wrap"><span>tape, MIT licensed. prices from DexScreener, charts from GeckoTerminal. not financial advice.</span><a href="https://github.com/OWNER/tape">github.com/OWNER/tape</a></div></footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>
